@@ -1,0 +1,121 @@
+/* bas-ems — components */
+
+/* panel */
+.panel { background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column;
+  overflow: hidden; }
+.panel-h { display: flex; align-items: center; gap: var(--s-2); padding: 9px var(--s-3);
+  border-bottom: 1px solid var(--line); background: rgba(255,255,255,.012); }
+.panel-h .t { font-size: var(--fs-2); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); }
+.panel-h .meta { margin-left: auto; font-family: var(--mono); font-size: var(--fs-1); color: var(--text-mut); }
+.panel-h .pill { font-family: var(--mono); font-size: var(--fs-0); padding: 2px 7px; border-radius: 10px;
+  border: 1px solid var(--line-2); color: var(--text-dim); }
+.panel-b { padding: var(--s-3); flex: 1; min-height: 0; }
+.panel-b.tight { padding: var(--s-2); }
+.panel-b.flush { padding: 0; }
+
+/* KPI tile */
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi .label { color: var(--text-mut); font-size: var(--fs-1); letter-spacing: .05em; text-transform: uppercase; }
+.kpi .val { font-family: var(--mono); font-size: var(--fs-6); line-height: 1.05; color: var(--text); font-weight: 600; }
+.kpi .val .u { font-size: var(--fs-2); color: var(--text-mut); margin-left: 4px; font-weight: 400; }
+.kpi .delta { font-family: var(--mono); font-size: var(--fs-1); }
+.kpi.accent .val { color: var(--accent); }
+.up { color: var(--good); } .down { color: var(--bad); } .flat { color: var(--text-mut); }
+
+.kpi-row { display: grid; grid-auto-flow: column; gap: var(--s-4); }
+.hdr-kpi { display:flex; flex-direction:column; justify-content:center; padding: 0 var(--s-3);
+  border-left: 1px solid var(--line); min-width: 92px; }
+.hdr-kpi .label { color: var(--text-mut); font-size: var(--fs-0); letter-spacing:.08em; text-transform:uppercase; }
+.hdr-kpi .val { font-family: var(--mono); font-size: var(--fs-4); color: var(--text); font-weight:600; }
+.hdr-kpi .val.accent { color: var(--accent); }
+.hdr-kpi .val.good { color: var(--good); } .hdr-kpi .val.warn { color: var(--warn); }
+
+/* state badges (SEMI E10) */
+.badge { display: inline-flex; align-items:center; gap: 5px; font-size: var(--fs-0); font-family: var(--mono);
+  padding: 2px 7px; border-radius: 4px; border:1px solid transparent; letter-spacing:.03em; white-space:nowrap; }
+.badge .b-dot { width:6px; height:6px; border-radius:50%; background: currentColor; }
+.st-Productive { color: var(--good); background: rgba(52,211,153,.10); border-color: rgba(52,211,153,.3); }
+.st-Standby { color: var(--accent-2); background: rgba(58,157,255,.10); border-color: rgba(58,157,255,.28); }
+.st-Engineering { color: var(--purple); background: rgba(154,123,255,.10); border-color: rgba(154,123,255,.28); }
+.st-Scheduled.Down, .st-ScheduledDown { color: var(--warn); }
+.st-UnscheduledDown { color: var(--bad); background: rgba(255,93,108,.10); border-color: rgba(255,93,108,.3); }
+.st-NonScheduled { color: var(--text-mut); border-color: var(--line-2); }
+.sev-INFO { color: var(--text-dim); } .sev-MINOR { color: var(--warn); }
+.sev-MAJOR { color: var(--bad); } .sev-CRIT { color: var(--crit); }
+
+/* generic table */
+table.tbl { width:100%; border-collapse: collapse; font-size: var(--fs-2); }
+table.tbl th { text-align:left; color: var(--text-mut); font-weight:600; font-size: var(--fs-0);
+  text-transform:uppercase; letter-spacing:.06em; padding: 6px 8px; border-bottom:1px solid var(--line-2); position:sticky; top:0; background: var(--bg-1); }
+table.tbl td { padding: 5px 8px; border-bottom:1px solid var(--line); font-family: var(--mono); color: var(--text-dim); white-space:nowrap; }
+table.tbl td.name { font-family: var(--sans); color: var(--text); }
+table.tbl tr:hover td { background: rgba(255,255,255,.02); }
+table.tbl td.num { text-align:right; color: var(--text); }
+
+/* bar / meter */
+.meter { height: 6px; border-radius: 4px; background: var(--bg-3); overflow:hidden; position:relative; }
+.meter > i { display:block; height:100%; background: linear-gradient(90deg, var(--accent-d), var(--accent)); border-radius:4px; transition: width .25s ease; }
+.meter.good > i { background: linear-gradient(90deg, var(--good-d), var(--good)); }
+.meter.warn > i { background: linear-gradient(90deg, #b9821f, var(--warn)); }
+.meter.bad > i  { background: linear-gradient(90deg, #c23545, var(--bad)); }
+
+/* canvas + svg surfaces */
+canvas.spark { display:block; width:100%; }
+.schematic { width:100%; height:auto; display:block; }
+.schematic .pipe { stroke: var(--line-3); stroke-width: 3; fill:none; }
+.schematic .flow { stroke: var(--accent); stroke-width: 2.5; fill:none; stroke-linecap:round; }
+.schematic .node { fill: var(--bg-3); stroke: var(--line-3); }
+.schematic .node.on { stroke: var(--accent); }
+.schematic text { fill: var(--text-dim); font-family: var(--mono); font-size: 10px; }
+.schematic .val { fill: var(--text); }
+/* never fall back to the browser serif default in SVG (gauges, schematics) */
+svg, svg text { font-family: var(--mono); }
+
+/* event ticker / stream */
+.eventrail .rail-h { display:flex; align-items:center; gap:8px; padding: 11px var(--s-3);
+  border-bottom:1px solid var(--line); }
+.eventrail .rail-h .t { font-size: var(--fs-2); font-weight:600; text-transform:uppercase; letter-spacing:.05em; color: var(--text-dim); }
+.eventrail .rail-h .rate { margin-left:auto; font-family: var(--mono); font-size: var(--fs-1); color: var(--accent); }
+.stream { flex:1; overflow:hidden; padding: 4px 0; }
+.evt { display:grid; grid-template-columns: 52px 1fr; gap: 8px; padding: 4px var(--s-3); font-size: var(--fs-1);
+  border-left: 2px solid transparent; }
+.evt .tm { font-family: var(--mono); color: var(--text-faint); font-size: var(--fs-1); }
+.evt .bd { min-width:0; }
+.evt .ty { font-family: var(--mono); color: var(--text); }
+.evt .mt { color: var(--text-mut); font-size: var(--fs-1); font-family: var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.evt.cls-lot { border-left-color: var(--c-lot); } .evt.cls-lot .ty { color: var(--c-lot); }
+.evt.cls-job { border-left-color: var(--c-job); }
+.evt.cls-wafer { border-left-color: var(--c-wafer); }
+.evt.cls-amhs { border-left-color: var(--c-amhs); } .evt.cls-amhs .ty { color: var(--c-amhs); }
+.evt.cls-fdc { border-left-color: var(--c-fdc); } .evt.cls-fdc .ty { color: var(--c-fdc); }
+.evt.cls-alarm { border-left-color: var(--c-alarm); background: rgba(255,93,108,.06); } .evt.cls-alarm .ty { color: var(--c-alarm); }
+.evt.cls-state { border-left-color: var(--c-state); }
+.evt.enter { animation: evtIn .28s ease; }
+@keyframes evtIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform:none; } }
+
+/* alarm banner */
+.alarmbanner { display:flex; align-items:center; gap: var(--s-3); padding: 7px var(--s-4);
+  background: linear-gradient(90deg, rgba(255,47,84,.16), rgba(255,47,84,.04)); border-bottom:1px solid rgba(255,47,84,.4);
+  font-size: var(--fs-2); }
+.alarmbanner.hidden { display:none; }
+.alarmbanner .ic { color: var(--crit); }
+.alarmbanner .msg { font-family: var(--mono); color: var(--text); }
+.alarmbanner .cnt { margin-left:auto; color: var(--bad); font-family: var(--mono); }
+
+/* misc */
+.dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
+.right { text-align: right; } .nowrap { white-space: nowrap; }
+.legend { display:flex; gap: var(--s-3); flex-wrap:wrap; font-size: var(--fs-1); color: var(--text-mut); }
+.legend .lg { display:inline-flex; align-items:center; gap:5px; }
+.legend .sw { width:9px; height:9px; border-radius:2px; }
+.stat-line { display:flex; justify-content:space-between; padding: 4px 0; border-bottom:1px solid var(--line); font-size: var(--fs-2); }
+.stat-line .k { color: var(--text-mut); } .stat-line .v { font-family: var(--mono); color: var(--text); }
+.big-read { font-family: var(--mono); font-size: var(--fs-7); color: var(--accent); line-height:1; }
+.flash-up { animation: flashUp .5s ease; } @keyframes flashUp { from{color:var(--good)} }
+
+/* respect reduced-motion: kill decorative CSS animation/transition (live JS data still updates) */
+@media (prefers-reduced-motion: reduce) {
+  .simmark .dot, .evt.enter, .flash-up { animation: none !important; }
+  * { transition-duration: 0.01ms !important; }
+}

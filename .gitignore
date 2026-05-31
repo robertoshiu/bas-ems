@@ -1,0 +1,15 @@
+# Agent / tooling state — not project code
+.claude/
+.gstack/
+.opencode/
+.omo/
+
+# Generated single-file build (regenerate with: bun build-single.mjs)
+bas-ems.html
+
+# Deps / OS / editor cruft
+node_modules/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

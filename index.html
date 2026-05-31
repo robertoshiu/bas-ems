@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>bas-ems · Fab Building Automation &amp; Energy Management</title>
+<meta name="description" content="Static simulation of a semiconductor fab Building Automation System (BAS) and Energy Management System (EMS). Synthetic data, no backend." />
+<link rel="stylesheet" href="styles/tokens.css" />
+<link rel="stylesheet" href="styles/layout.css" />
+<link rel="stylesheet" href="styles/components.css" />
+</head>
+<body>
+<div id="app"></div>
+
+<!-- engine (order matters: prng -> clock -> master-data -> events -> load-model -> sim) -->
+<script src="src/engine/prng.js"></script>
+<script src="src/engine/clock.js"></script>
+<script src="src/engine/master-data.js"></script>
+<script src="src/engine/events.js"></script>
+<script src="src/engine/load-model.js"></script>
+<script src="src/engine/sim.js"></script>
+
+<!-- ui primitives -->
+<script src="src/ui/util.js"></script>
+<script src="src/ui/widgets.js"></script>
+<script src="src/ui/ticker.js"></script>
+<script src="src/ui/livefab.js"></script>
+
+<!-- modules (registration order; nav groups by 'group') -->
+<script src="src/modules/production.js"></script>
+<script src="src/modules/cleanroom.js"></script>
+<script src="src/modules/cooling.js"></script>
+<script src="src/modules/upw.js"></script>
+<script src="src/modules/gas-exhaust.js"></script>
+<script src="src/modules/energy.js"></script>
+<script src="src/modules/sustainability.js"></script>
+<script src="src/modules/masterdata.js"></script>
+
+<!-- app shell + boot (must be last) -->
+<script src="src/app/shell.js"></script>
+<script src="src/app/main.js"></script>
+</body>
+</html>

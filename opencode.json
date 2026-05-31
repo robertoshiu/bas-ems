@@ -1,0 +1,48 @@
+{
+  "plugin": [
+    "oh-my-openagent@4.4.0"
+  ],
+  "provider": {
+    "nvidia": {
+      "name": "NVIDIA",
+      "options": {
+        "baseURL": "https://integrate.api.nvidia.com/v1",
+        "apiKey": "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"
+      },
+      "models": {
+        "minimaxai/minimax-m2.1": {
+          "name": "Minimax M2.1",
+          "limit": {
+            "context": 204800,
+            "output": 131072
+          }
+        },
+        "moonshotai/kimi-k2.5-thinking": {
+          "name": "Kimi K2.5 Thinking"
+        },
+        "moonshotai/kimi-k2.5": {
+          "name": "Kimi K2.5"
+        },
+        "moonshotai/kimi-k2-thinking": {
+          "name": "Kimi K2 Thinking",
+          "limit": {
+            "context": 262144,
+            "output": 262144
+          }
+        }
+      }
+    }
+  },
+  "permission": {
+    "bash": "allow",
+    "read": "allow",
+    "write": "allow",
+    "edit": "allow",
+    "patch": "allow",
+    "webfetch": "allow",
+    "lsp": "allow",
+    "todowrite": "allow",
+    "todoread": "allow"
+  },
+  "$schema": "https://opencode.ai/config.json"
+}

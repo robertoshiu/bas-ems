@@ -1,0 +1,57 @@
+/* bas-ems — design tokens (dark industrial SCADA, generic-vendor)
+   No web fonts (system stack) so it renders identically from file://. */
+:root {
+  /* surfaces */
+  --bg:        #080b11;
+  --bg-1:      #0c111a;
+  --bg-2:      #111826;
+  --bg-3:      #18212f;
+  --bg-raise:  #1c2636;
+  --line:      #1e2a3b;
+  --line-2:    #2b3b53;
+  --line-3:    #3a4f6e;
+
+  /* text */
+  --text:      #d4dceb;
+  --text-dim:  #8b99b0;
+  --text-mut:  #5c6981;
+  --text-faint:#3f4a5e;
+
+  /* accents */
+  --accent:    #25e0cf;   /* primary cyan/teal */
+  --accent-d:  #14a89b;
+  --accent-2:  #3a9dff;   /* electric blue */
+  --good:      #34d399;
+  --good-d:    #1f9d74;
+  --warn:      #f5b73d;
+  --bad:       #ff5d6c;
+  --crit:      #ff2f54;
+  --purple:    #9a7bff;
+  --pink:      #ff7ac6;
+
+  /* event-class hues */
+  --c-lot:     #3a9dff;
+  --c-job:     #25e0cf;
+  --c-wafer:   #7c89a0;
+  --c-amhs:    #9a7bff;
+  --c-fdc:     #f5b73d;
+  --c-alarm:   #ff5d6c;
+  --c-state:   #5fd0a8;
+
+  /* fonts */
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* type scale */
+  --fs-0: 10px; --fs-1: 11px; --fs-2: 12px; --fs-3: 13px; --fs-4: 15px;
+  --fs-5: 18px; --fs-6: 24px; --fs-7: 32px; --fs-8: 42px;
+
+  /* spacing */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;
+  --radius: 6px; --radius-s: 4px;
+
+  /* effects */
+  --shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 0 1px var(--line);
+  --glow: 0 0 12px;
+  --grid-line: rgba(120,150,190,.06);
+}
