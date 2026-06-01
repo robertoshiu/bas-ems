@@ -218,10 +218,11 @@
   }
 
   // Map a U.band result ('good'|'warn'|'bad') to a badge HTML string for UPW quality rows.
-  // Mirrors cleanroom.js: warn -> 'Standby' / 'Near-spec'; bad -> 'UnscheduledDown' / 'Excursion'.
+  // SCADA 3-level convention: good=green (Productive), warn=amber (NearSpec), bad=red (UnscheduledDown).
+  // warn uses st-NearSpec (amber) NOT st-Standby (blue) — blue reads as "offline/standby" to an operator.
   function qualBadge(bandResult) {
     if (bandResult === 'bad')  return badgeHtml('UnscheduledDown', 'Excursion');
-    if (bandResult === 'warn') return badgeHtml('Standby',         'Near-spec');
+    if (bandResult === 'warn') return badgeHtml('NearSpec',        'Near-spec');
     return badgeHtml('Productive', 'In-spec');
   }
 

@@ -214,9 +214,9 @@ function syntheticFrame(overrides) {
   };
 }
 
-// Badge class helpers: the badge() function produces e.g. st-Standby or st-UnscheduledDown
-// Warn state maps to 'st-Standby', bad state maps to 'st-UnscheduledDown'
-function hasWarnBadge(badge) { return badge && badge.indexOf('st-Standby') !== -1; }
+// Badge class helpers: qualBadge() produces e.g. st-NearSpec or st-UnscheduledDown
+// Warn maps to 'st-NearSpec' (amber), bad maps to 'st-UnscheduledDown' (red), good to 'st-Productive' (green)
+function hasWarnBadge(badge) { return badge && badge.indexOf('st-NearSpec') !== -1; }
 function hasBadBadge(badge)  { return badge && badge.indexOf('st-UnscheduledDown') !== -1; }
 function hasGoodBadge(badge) { return badge && badge.indexOf('st-Productive') !== -1; }
 
@@ -229,6 +229,17 @@ if (rows1) {
   ok('resistivity=18.14 (below bad threshold 18.1863) -> warn or bad badge',
     resRow1 && (hasWarnBadge(resRow1.badge) || hasBadBadge(resRow1.badge)),
     'badge: ' + (resRow1 ? resRow1.badge : 'none'));
+}
+
+// Test resistivity in the warn-only band (18.1863 < 18.188 < 18.1899) -> warn, NOT bad
+driveToNextTableUpdate(syntheticFrame({ kpis: { upwResistivity: 18.188, upwTOC: 0.65 } }));
+var rowsW = findTableNode(rootEl);
+rowsW = rowsW ? rowsW._lastRows : null;
+if (rowsW) {
+  var resRowW = rowsW[0];
+  ok('resistivity=18.188 (warn-only band) -> warn badge, not bad',
+    resRowW && hasWarnBadge(resRowW.badge) && !hasBadBadge(resRowW.badge),
+    'badge: ' + (resRowW ? resRowW.badge : 'none'));
 }
 
 // Test TOC 1.1 (above bad threshold 0.7810) -> bad badge
