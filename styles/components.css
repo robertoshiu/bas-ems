@@ -233,8 +233,39 @@ canvas.trend-chart { display:block; width:100%; cursor:default; }
 }
 .navitem.flash { animation: navFlash 0.65s ease forwards; }
 
+/* demo / guided-mode button (lives in topbar, near the clock) */
+.demo-btn {
+  background: var(--bg-3); color: var(--text-dim);
+  border: 1px solid var(--line-2); border-radius: 4px;
+  font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .10em;
+  padding: 3px 10px; cursor: pointer; margin-left: var(--s-2);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.demo-btn:hover { color: var(--text); border-color: var(--line-3); }
+.demo-btn.active, .demo-btn[aria-pressed="true"] {
+  color: var(--accent); border-color: var(--accent);
+  background: rgba(100,178,255,.12);
+}
+
+/* demo caption strip — fixed top-center just below the 50px topbar.
+   Collision-free: replay-strip is at bottom:118px; cockpit at very bottom. */
+.demo-caption {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  top: 54px; z-index: 45;
+  display: flex; align-items: center; gap: 8px;
+  max-width: 72vw; padding: 7px 16px;
+  background: rgba(12,17,26,.95); border: 1px solid var(--accent);
+  border-radius: 8px; font-family: var(--mono); font-size: var(--fs-2);
+  color: var(--text); box-shadow: var(--shadow);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.demo-caption .demo-caption-icon { color: var(--accent); flex-shrink: 0; }
+.demo-caption .demo-caption-text { overflow: hidden; text-overflow: ellipsis; }
+
 /* respect reduced-motion: kill decorative CSS animation/transition (live JS data still updates) */
 @media (prefers-reduced-motion: reduce) {
   .simmark .dot, .evt.enter, .flash-up, .navitem.flash { animation: none !important; }
+  .demo-caption { transition: none !important; }
   * { transition-duration: 0.01ms !important; }
 }

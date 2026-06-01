@@ -9,6 +9,120 @@ window.BAS = window.BAS || {};
   var refs = {}, mounted = {}, activeId = null, ticker = null;
   var GROUP_ORDER = ['Operations', 'BAS', 'EMS', 'Master Data'];
 
+  // ---- Demo / Guided mode state ----
+  var demoOn = false;
+  var demoTimer = null;       // rotation setInterval id
+  var demoIdleTimer = null;   // idle-resume setTimeout id
+  var demoNavigating = false; // true only while demo writes location.hash
+  // Respect prefers-reduced-motion
+  var reducedMotion = (typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var DEMO_DWELL = reducedMotion ? 18000 : 12000;   // ms per slide
+  var DEMO_IDLE  = 20000;                             // ms idle before resume
+
+  function demoNextModule() {
+    var ids = navOrder();
+    var idx = ids.indexOf(activeId);
+    var next = ids[(idx + 1) % ids.length];
+    demoNavigating = true;
+    location.hash = '#' + next;
+    // demoNavigating cleared in onHash (after activate)
+  }
+
+  function demoStartTimer() {
+    if (demoTimer) clearInterval(demoTimer);
+    demoTimer = setInterval(demoNextModule, DEMO_DWELL);
+  }
+
+  function demoStopTimer() {
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+  }
+
+  function demoStopIdleTimer() {
+    if (demoIdleTimer) { clearTimeout(demoIdleTimer); demoIdleTimer = null; }
+  }
+
+  // A manual nav or keypress while demo is ON: pause rotation, resume after idle
+  function demoPauseForManualNav() {
+    if (!demoOn) return;
+    demoStopTimer();
+    demoStopIdleTimer();
+    demoIdleTimer = setTimeout(function () {
+      if (demoOn) demoStartTimer();
+    }, DEMO_IDLE);
+  }
+
+  function demoTurnOn() {
+    demoOn = true;
+    if (refs.demoBtn) {
+      refs.demoBtn.classList.add('active');
+      refs.demoBtn.setAttribute('aria-pressed', 'true');
+    }
+    if (refs.demoCaption) refs.demoCaption.style.display = '';
+    demoStartTimer();
+  }
+
+  function demoTurnOff() {
+    demoOn = false;
+    demoStopTimer();
+    demoStopIdleTimer();
+    if (refs.demoBtn) {
+      refs.demoBtn.classList.remove('active');
+      refs.demoBtn.setAttribute('aria-pressed', 'false');
+    }
+    if (refs.demoCaption) refs.demoCaption.style.display = 'none';
+  }
+
+  function demoToggle() {
+    if (demoOn) demoTurnOff(); else demoTurnOn();
+  }
+
+  // Build a narration caption from the current frame
+  var DEMO_MODULE_LABELS = {
+    production:   'Production Floor — tool states, lot tracking & AMHS moves',
+    trends:       'Trends & Historian — 180-min KPI sparklines for all subsystems',
+    cleanroom:    'Cleanroom HVAC — ISO 14644 zone pressure & FFU airflow',
+    cooling:      'PCW Cooling — process-chilled-water loop temperatures & flow',
+    upw:          'Ultra-Pure Water — resistivity ' + 'Ω' + '\xb7cm, TOC, flow balance',
+    'gas-exhaust':'Gas & Exhaust — acid/base/solvent CFM abatement balance',
+    energy:       'Energy Distribution — facility MW breakdown by subsystem',
+    sustainability:'Sustainability — CO₂e rate & rolling cost analytics',
+    masterdata:   'Master Data — tool registry, E10 state-time allocation'
+  };
+
+  function demoBuildCaption(frame, moduleId) {
+    var moduleLabel = DEMO_MODULE_LABELS[moduleId] || moduleId;
+    var evts = frame.newEvents;
+    var kp = frame.kpis;
+    var eventSentence = '';
+    if (evts && evts.length) {
+      // Pick first event of interest to narrate
+      var e = evts[0];
+      var etype = (e.type || e.kind || '');
+      var emeta = (e.meta || e.msg || e.text || '');
+      if (etype || emeta) {
+        eventSentence = etype + (emeta ? ' — ' + emeta : '');
+        if (eventSentence.length > 90) eventSentence = eventSentence.slice(0, 87) + '…';
+      }
+    }
+    // Fallback: derive from load/kpis (never blank)
+    if (!eventSentence) {
+      eventSentence = 'Fab drawing ' + kp.totalMW.toFixed(1) + ' MW' +
+        ' \xb7 overhead ' + kp.overheadRatio.toFixed(2) + '\xd7' +
+        ' \xb7 UPW ' + kp.upwResistivity.toFixed(1) + ' MΩ\xb7cm';
+    }
+    return moduleLabel + '  ▸  ' + eventSentence;
+  }
+
+  function demoUpdateCaption(frame) {
+    if (!demoOn || !refs.demoCaption) return;
+    var text = demoBuildCaption(frame, activeId);
+    // Only update DOM text when it changed (avoids flicker at 60 Hz)
+    if (refs.demoCaptionText.textContent !== text) {
+      refs.demoCaptionText.textContent = text;
+    }
+  }
+
   // ---- Alarm history ring buffer (closure-scope, NOT in frame) ----
   var HIST_N = 200;
   var histBuf = new Array(HIST_N);
@@ -103,7 +217,31 @@ window.BAS = window.BAS || {};
     clock.setAttribute('aria-label', 'Simulation clock');
     top.appendChild(clock);
     refs.clock = clock.querySelector('#clk');
+
+    // demo / guided-mode toggle button
+    var demoBtn = el('button', 'demo-btn');
+    demoBtn.textContent = 'DEMO';
+    demoBtn.title = 'Guided demo mode — auto-rotates modules with live narration (D)';
+    demoBtn.setAttribute('aria-pressed', 'false');
+    demoBtn.addEventListener('click', function () { demoToggle(); });
+    top.appendChild(demoBtn);
+    refs.demoBtn = demoBtn;
+
     app.appendChild(top);
+
+    // demo caption strip — fixed, top-center just below the topbar (collision-free:
+    // replay-strip is at bottom:118px, cockpit is at the very bottom)
+    var demoCaption = el('div', 'demo-caption');
+    demoCaption.setAttribute('role', 'status');
+    demoCaption.setAttribute('aria-live', 'polite');
+    demoCaption.style.display = 'none';
+    var demoCaptionText = el('span', 'demo-caption-text');
+    demoCaptionText.textContent = 'Demo mode — live production → facility coupling';
+    demoCaption.appendChild(el('span', 'demo-caption-icon', '▶'));
+    demoCaption.appendChild(demoCaptionText);
+    document.body.appendChild(demoCaption);
+    refs.demoCaption = demoCaption;
+    refs.demoCaptionText = demoCaptionText;
 
     // alarm banner
     var banner = el('div', 'alarmbanner hidden');
@@ -214,13 +352,17 @@ window.BAS = window.BAS || {};
     activate(initial);
 
     window.addEventListener('keydown', function (e) {
-      if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;   // don't hijack browser shortcuts (Alt+←/→ Back/Fwd, Ctrl/Cmd+digit tab switch)
+      // D toggles demo from any focus context (including topbar button focus)
+      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); demoToggle(); return; }
+      if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
       if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
       else if (e.key === ',') { e.preventDefault(); BAS.clockSource.step(-1); }
       else if (e.key === '.') { e.preventDefault(); BAS.clockSource.step(1); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
+        // Manual nav while demo is on — pause and schedule resume
+        if (demoOn) demoPauseForManualNav();
         var orderedIds = navOrder();
         var idx = orderedIds.indexOf(activeId);
         if (idx < 0) idx = 0;
@@ -230,13 +372,19 @@ window.BAS = window.BAS || {};
       } else if (e.key === 'Escape') {
         e.preventDefault();
         if (dropdownOpen) { closeDropdown(); return; }
+        if (demoOn) demoPauseForManualNav();
         location.hash = '#production';
       } else {
         var d = parseInt(e.key, 10);
         // digits 1-9 only; cap matches current module count (extend if modules expand)
         if (d >= 1 && d <= 9) {
           var ids = navOrder();
-          if (d - 1 < ids.length) { e.preventDefault(); location.hash = '#' + ids[d - 1]; }
+          if (d - 1 < ids.length) {
+            e.preventDefault();
+            // Manual nav while demo is on — pause and schedule resume
+            if (demoOn) demoPauseForManualNav();
+            location.hash = '#' + ids[d - 1];
+          }
         }
       }
     });
@@ -398,7 +546,14 @@ window.BAS = window.BAS || {};
     });
   }
 
-  function onHash() { activate((location.hash || '').replace('#', '')); }
+  function onHash() {
+    // Detect manual navigations (user clicked nav / typed hash) while demo is on
+    if (demoOn && !demoNavigating) {
+      demoPauseForManualNav();
+    }
+    demoNavigating = false;   // always clear after the hash change is processed
+    activate((location.hash || '').replace('#', ''));
+  }
 
   function activate(id) {
     var def = BAS.moduleById(id) || BAS.modules[0];
@@ -486,6 +641,9 @@ window.BAS = window.BAS || {};
     }
 
     if (refs.cockpit) refs.cockpit.update(frame);
+
+    // demo caption update (no-op when demo is off)
+    demoUpdateCaption(frame);
   }
 
   BAS.app = { build: build, update: function (f) { update(f); }, get active() { return activeId; } };
