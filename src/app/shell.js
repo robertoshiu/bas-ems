@@ -53,10 +53,9 @@ window.BAS = window.BAS || {};
     // Force a reflow so removing+re-adding the class always restarts the animation.
     void item.offsetWidth;
     item.classList.add('flash');
-    var tid = setTimeout(function () { item.classList.remove('flash'); }, 700);
-    // Store so repeated clicks clear the previous timer (not strictly needed but tidy).
+    // Cancel any prior flash timer BEFORE creating the new one (restart-safe on rapid clicks).
     if (item._flashTid) clearTimeout(item._flashTid);
-    item._flashTid = tid;
+    item._flashTid = setTimeout(function () { item.classList.remove('flash'); }, 700);
   }
 
   function navigateToAlarm(area) {

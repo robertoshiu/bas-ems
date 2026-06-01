@@ -68,13 +68,13 @@ window.BAS = window.BAS || {};
       var mt = el('div', 'mt'); mt.textContent = meta(e);
       bd.appendChild(ty); bd.appendChild(mt);
       row.appendChild(tm); row.appendChild(bd);
-      // Alarm rows are clickable when an onAlarmClick callback is provided.
-      if (e.cls === 'alarm' && opts.onAlarmClick) {
-        row.style.cursor = 'pointer';
-        row.classList.add('clickable-alarm');
+      // Alarm rows are clickable when an onAlarmClick callback is provided and the event
+      // carries an area (guard avoids a silent navigate-to-default on a malformed event).
+      if (e.cls === 'alarm' && opts.onAlarmClick && e.area) {
+        row.classList.add('clickable-alarm');   // cursor:pointer via CSS
         (function (area) {
           row.addEventListener('click', function () { opts.onAlarmClick(area); });
-        })(e.area || '');
+        })(e.area);
       }
       return row;
     }

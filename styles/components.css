@@ -104,6 +104,7 @@ svg, svg text { font-family: var(--mono); }
 .evt.cls-amhs { border-left-color: var(--c-amhs); } .evt.cls-amhs .ty { color: var(--c-amhs); }
 .evt.cls-fdc { border-left-color: var(--c-fdc); } .evt.cls-fdc .ty { color: var(--c-fdc); }
 .evt.cls-alarm { border-left-color: var(--c-alarm); background: rgba(255,93,108,.06); } .evt.cls-alarm .ty { color: var(--c-alarm); }
+.evt.clickable-alarm { cursor: pointer; } .evt.clickable-alarm:hover { background: rgba(255,93,108,.12); }
 .evt.cls-state { border-left-color: var(--c-state); }
 .evt.enter { animation: evtIn .28s ease; }
 @keyframes evtIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform:none; } }
