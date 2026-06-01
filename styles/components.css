@@ -219,8 +219,16 @@ svg, svg text { font-family: var(--mono); }
 .big-read { font-family: var(--mono); font-size: var(--fs-7); color: var(--accent); line-height:1; }
 .flash-up { animation: flashUp .5s ease; } @keyframes flashUp { from{color:var(--good)} }
 
+/* nav-item flash: briefly highlight the destination nav item on alarm navigation */
+@keyframes navFlash {
+  0%   { box-shadow: 0 0 0 2px var(--accent), inset 0 0 0 1px var(--accent); border-color: var(--accent); }
+  60%  { box-shadow: 0 0 0 2px var(--accent), inset 0 0 0 1px var(--accent); border-color: var(--accent); }
+  100% { box-shadow: none; border-color: transparent; }
+}
+.navitem.flash { animation: navFlash 0.65s ease forwards; }
+
 /* respect reduced-motion: kill decorative CSS animation/transition (live JS data still updates) */
 @media (prefers-reduced-motion: reduce) {
-  .simmark .dot, .evt.enter, .flash-up { animation: none !important; }
+  .simmark .dot, .evt.enter, .flash-up, .navitem.flash { animation: none !important; }
   * { transition-duration: 0.01ms !important; }
 }

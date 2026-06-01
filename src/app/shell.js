@@ -31,6 +31,9 @@ window.BAS = window.BAS || {};
   }
 
   // ---- Area -> module resolver ----
+  // Cleanroom module is purely environmental (HVAC/FFU/ISO 14644) — no per-process
+  // or per-tool view. Process alarms from all areas (ETCH, WET, LITHO, etc.) are
+  // most useful in the Production Floor module, so all areas map to 'production'.
   var AREA_MODULE = {
     LITHO: 'production', ETCH: 'production', DIFF: 'production',
     IMPL: 'production', CMP: 'production', WET: 'production',
@@ -38,6 +41,28 @@ window.BAS = window.BAS || {};
   };
   function resolveModule(area) {
     return AREA_MODULE[area] || 'production';
+  }
+
+  // ---- Alarm-navigation helpers ----
+  // Flash the destination nav item briefly with an accent border to confirm navigation.
+  function navFlash(moduleId) {
+    var ni = refs.navItems && refs.navItems[moduleId];
+    if (!ni) return;
+    var item = ni.item;
+    item.classList.remove('flash');
+    // Force a reflow so removing+re-adding the class always restarts the animation.
+    void item.offsetWidth;
+    item.classList.add('flash');
+    var tid = setTimeout(function () { item.classList.remove('flash'); }, 700);
+    // Store so repeated clicks clear the previous timer (not strictly needed but tidy).
+    if (item._flashTid) clearTimeout(item._flashTid);
+    item._flashTid = tid;
+  }
+
+  function navigateToAlarm(area) {
+    var moduleId = resolveModule(area);
+    location.hash = '#' + moduleId;
+    navFlash(moduleId);
   }
 
   // ---- Dropdown state ----
@@ -171,7 +196,9 @@ window.BAS = window.BAS || {};
     stream.dataset.filter = 'all';
     rail.appendChild(stream);
     body.appendChild(rail);
-    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3 }); // 3x slower than prior 2/s → ~1.5s/row
+    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3, // 3x slower than prior 2/s → ~1.5s/row
+      onAlarmClick: function (area) { navigateToAlarm(area); }
+    });
 
     app.appendChild(body);
 
