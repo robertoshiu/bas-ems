@@ -49,20 +49,19 @@
       });
 
       // Node coordinates for a 560×200 viewBox:
-      //   CHLR-01..03  x=10, y=20/70/120
-      //   CHLR-04..06  x=80, y=20/70/120
-      //   CHW-HDR      x=165, y=70
-      //   PROC-LOAD    x=340, y=70
-      //   CT-01..03    x=430, y=10/70/130
-      //   CW-HDR       x=265, y=155
+      //   CHLR-01..03  x=10,  y=18/68/118    CHLR-04..06  x=80, y=18/68/118
+      //   CHW-HDR      x=168, y=68           PROC (load)  x=270, y=68
+      //   CT-01..03    x=370, y=10/68/126    CW-HDR       x=465, y=68
+      // Node value labels all show cooling tons (chwRT/pcwRT) for a consistent unit;
+      // pipe flow speed is driven by chwKW (electrical load proxy). Return lines omitted for clarity.
       schematic = U.Schematic(schP._body, {
         width: 560,
         height: 200,
         nodes: [
           // Chillers (left bank, two columns of 3)
-          { id: 'CHLR-01', label: 'CHLR-01', x: 10,  y: 18,  channel: 'chwKW' },
-          { id: 'CHLR-02', label: 'CHLR-02', x: 10,  y: 68,  channel: 'chwKW' },
-          { id: 'CHLR-03', label: 'CHLR-03', x: 10,  y: 118, channel: 'chwKW' },
+          { id: 'CHLR-01', label: 'CHLR-01', x: 10,  y: 18,  channel: 'chwRT' },
+          { id: 'CHLR-02', label: 'CHLR-02', x: 10,  y: 68,  channel: 'chwRT' },
+          { id: 'CHLR-03', label: 'CHLR-03', x: 10,  y: 118, channel: 'chwRT' },
           { id: 'CHLR-04', label: 'CHLR-04', x: 80,  y: 18,  channel: 'chwRT' },
           { id: 'CHLR-05', label: 'CHLR-05', x: 80,  y: 68,  channel: 'chwRT' },
           { id: 'CHLR-06', label: 'CHLR-06', x: 80,  y: 118, channel: 'chwRT' },
@@ -75,7 +74,7 @@
           { id: 'CT-02',   label: 'CT-02',    x: 370, y: 68,  channel: 'chwRT' },
           { id: 'CT-03',   label: 'CT-03',    x: 370, y: 126, channel: 'chwRT' },
           // CW Header (bottom right, condenser water return)
-          { id: 'CW-HDR',  label: 'CW Hdr',   x: 465, y: 68,  channel: 'chwKW' }
+          { id: 'CW-HDR',  label: 'CW Hdr',   x: 465, y: 68,  channel: 'chwRT' }
         ],
         pipes: [
           // Chiller bank 1 → CHW Header (chilled water supply — animated by chwKW)
