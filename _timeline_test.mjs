@@ -85,5 +85,15 @@ ok('density nonzero somewhere', Array.from(td.density).some(v => v > 0));
 const firstTool = BAS.master.tools[0].id;
 ok('e10 ribbon for a tool', Array.isArray(td.e10[firstTool]) && td.e10[firstTool].length > 0);
 
+// ---- Task 7: replay caption builder (pure) ----
+load('src/app/replay.js');
+const al = BAS.ui.timelineData.get().alarms[0];
+const w = BAS.replay._window(al);
+ok('replay window brackets the alarm', w.startT <= al.setT && w.endT >= al.clearT && w.endT > w.startT);
+const caps = BAS.replay._captions(al);
+ok('captions non-empty', caps.length >= 2, String(caps.length));
+ok('captions sorted by t', caps.every((c, i) => i === 0 || c.t >= caps[i - 1].t));
+ok('a caption mentions ALARM', caps.some(c => /ALARM|ALID/.test(c.text)));
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);
