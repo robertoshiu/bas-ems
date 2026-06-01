@@ -20,6 +20,10 @@
   var waterRows = {}, reuseMeter, reuseMeterVal;
   // sparklines
   var spkCO2, spkRen;
+  // decarbonization target live refs (cached at mount)
+  var tgtRenVal, tgtRenBar;
+  var tgtCO2Val;
+  var tgtWaterVal, tgtWaterBar;
   var fc = 0;
 
   BAS.registerModule({
@@ -113,14 +117,7 @@
 
       // ---- targets / context panel ------------------------------------
       var tgP = U.panel('Decarbonization Targets', { cls: 'col-4' });
-      tgP._body.appendChild(statBlock([
-        ['t1', '2030 Renewable Target'],
-        ['t2', 'Net-Zero Scope 2 Target'],
-        ['t3', 'Water Reuse Goal'],
-        ['t4', 'Reporting Basis']
-      ], {}, {
-        t1: '60 % RE100', t2: 'FY2035', t3: '> 80 %', t4: 'ISO 14064-1'
-      }));
+      tgP._body.appendChild(buildTargets());
       grid.appendChild(tgP);
 
       root.appendChild(grid);
@@ -208,11 +205,72 @@
         reuseMeter.className = 'meter ' + st;
         reuseMeter._fill.style.width = Math.max(0, Math.min(100, reusePct)) + '%';
         reuseMeterVal.textContent = fmt.n(reusePct, 1) + ' %';
+
+        // ---- Decarbonization target live values -------------------------
+        // 2030 Renewable Target: current renewablePct -> 60% RE100
+        tgtRenVal.textContent = fmt.n(ren, 1) + '% -> 60% RE100';
+        var renRatio = Math.min(1, ren / 60);
+        tgtRenBar._fill.style.width = (renRatio * 100).toFixed(1) + '%';
+        tgtRenBar.className = 'meter ' + U.band(ren, 40, 25, true);
+
+        // Net-Zero Scope 2 Target: current co2eRate -> FY2035 (no % bar — year target)
+        tgtCO2Val.textContent = fmt.n(co2e, 2) + ' t/h -> FY2035';
+
+        // Water Reuse Goal: current waterReusePct -> >80%
+        tgtWaterVal.textContent = fmt.n(reusePct, 1) + '% -> >80%';
+        var waterRatio = Math.min(1, reusePct / 80);
+        tgtWaterBar._fill.style.width = (waterRatio * 100).toFixed(1) + '%';
+        tgtWaterBar.className = 'meter ' + U.band(reusePct, 75, 65, true);
       }
     }
   });
 
   // ---- helpers -----------------------------------------------------------
+
+  // Build the Decarbonization Targets panel content.
+  // Caches live value spans + meter fills into module-scope refs for throttled updates.
+  function buildTargets() {
+    var wrap = el('div');
+
+    // Row helper: label + value span, optional progress meter below
+    function tgtRow(label, initVal, withMeter) {
+      var r = el('div', 'stat-line');
+      r.appendChild(el('span', 'k', label));
+      var v = el('span', 'v', initVal);
+      r.appendChild(v);
+      wrap.appendChild(r);
+      var barRef = null;
+      if (withMeter) {
+        var m = el('div', 'meter');
+        var fill = el('i'); fill.style.width = '0%'; m.appendChild(fill);
+        m._fill = fill;
+        m.style.marginBottom = '6px';
+        wrap.appendChild(m);
+        barRef = m;
+      }
+      return { valSpan: v, bar: barRef };
+    }
+
+    // 2030 Renewable Target — live current% + static target; progress bar
+    var r1 = tgtRow('2030 Renewable Target', '—% -> 60% RE100', true);
+    tgtRenVal = r1.valSpan;
+    tgtRenBar = r1.bar;
+
+    // Net-Zero Scope 2 Target — live co2eRate + FY2035; no numeric % bar (year target)
+    var r2 = tgtRow('Net-Zero Scope 2 Target', '—.— t/h -> FY2035', false);
+    tgtCO2Val = r2.valSpan;
+
+    // Water Reuse Goal — live current% + static target; progress bar
+    var r3 = tgtRow('Water Reuse Goal', '—% -> >80%', true);
+    tgtWaterVal = r3.valSpan;
+    tgtWaterBar = r3.bar;
+
+    // Reporting Basis — fully static
+    tgtRow('Reporting Basis', 'ISO 14064-1', false);
+
+    return wrap;
+  }
+
   function pct1(v) { return v.toFixed(1); }
 
   function centered(node) {

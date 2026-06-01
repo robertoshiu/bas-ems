@@ -9,6 +9,130 @@ window.BAS = window.BAS || {};
   var refs = {}, mounted = {}, activeId = null, ticker = null;
   var GROUP_ORDER = ['Operations', 'BAS', 'EMS', 'Master Data'];
 
+  // ---- Demo / Guided mode state ----
+  var demoOn = false;
+  var demoTimer = null;       // rotation setInterval id
+  var demoIdleTimer = null;   // idle-resume setTimeout id
+  var demoNavigating = false; // true only while demo writes location.hash
+  var demoCapFc = 0;          // caption rebuild throttle counter
+  var demoCapLastModule = null;
+  // Respect prefers-reduced-motion
+  var reducedMotion = (typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var DEMO_DWELL = reducedMotion ? 18000 : 12000;   // ms per slide
+  var DEMO_IDLE  = 20000;                             // ms idle before resume
+
+  function demoNextModule() {
+    var ids = navOrder();
+    var idx = ids.indexOf(activeId);
+    var next = ids[(idx + 1) % ids.length];
+    if (next === activeId) return;   // no different module to advance to — a no-op hash write
+                                     // fires no hashchange, which would leave demoNavigating stuck true
+    demoNavigating = true;
+    location.hash = '#' + next;
+    // demoNavigating cleared in onHash (after activate); the guard above guarantees the
+    // hash actually changes, so onHash always fires and clears the flag.
+  }
+
+  function demoStartTimer() {
+    if (demoTimer) clearInterval(demoTimer);
+    demoTimer = setInterval(demoNextModule, DEMO_DWELL);
+  }
+
+  function demoStopTimer() {
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+  }
+
+  function demoStopIdleTimer() {
+    if (demoIdleTimer) { clearTimeout(demoIdleTimer); demoIdleTimer = null; }
+  }
+
+  // A manual nav or keypress while demo is ON: pause rotation, resume after idle
+  function demoPauseForManualNav() {
+    if (!demoOn) return;
+    demoStopTimer();
+    demoStopIdleTimer();
+    demoIdleTimer = setTimeout(function () {
+      if (demoOn) demoStartTimer();
+    }, DEMO_IDLE);
+  }
+
+  function demoTurnOn() {
+    demoOn = true;
+    if (refs.demoBtn) {
+      refs.demoBtn.classList.add('active');
+      refs.demoBtn.setAttribute('aria-pressed', 'true');
+    }
+    if (refs.demoCaption) refs.demoCaption.style.display = '';
+    demoStartTimer();
+  }
+
+  function demoTurnOff() {
+    demoOn = false;
+    demoStopTimer();
+    demoStopIdleTimer();
+    if (refs.demoBtn) {
+      refs.demoBtn.classList.remove('active');
+      refs.demoBtn.setAttribute('aria-pressed', 'false');
+    }
+    if (refs.demoCaption) refs.demoCaption.style.display = 'none';
+  }
+
+  function demoToggle() {
+    if (demoOn) demoTurnOff(); else demoTurnOn();
+  }
+
+  // Build a narration caption from the current frame
+  var DEMO_MODULE_LABELS = {
+    production:   'Production Floor — tool states, lot tracking & AMHS moves',
+    trends:       'Trends & Historian — 180-min KPI sparklines for all subsystems',
+    cleanroom:    'Cleanroom HVAC — ISO 14644 zone pressure & FFU airflow',
+    cooling:      'PCW Cooling — process-chilled-water loop temperatures & flow',
+    upw:          'Ultra-Pure Water — resistivity ' + 'Ω' + '\xb7cm, TOC, flow balance',
+    'gas-exhaust':'Gas & Exhaust — acid/base/solvent CFM abatement balance',
+    energy:       'Energy Distribution — facility MW breakdown by subsystem',
+    sustainability:'Sustainability — CO₂e rate & rolling cost analytics',
+    masterdata:   'Master Data — tool registry, E10 state-time allocation'
+  };
+
+  function demoBuildCaption(frame, moduleId) {
+    var moduleLabel = DEMO_MODULE_LABELS[moduleId] || moduleId;
+    var evts = frame.newEvents;
+    var kp = frame.kpis;
+    var eventSentence = '';
+    if (evts && evts.length) {
+      // Pick first event of interest to narrate
+      var e = evts[0];
+      var etype = (e.type || e.kind || '');
+      var emeta = (e.meta || e.msg || e.text || '');
+      if (etype || emeta) {
+        eventSentence = etype + (emeta ? ' — ' + emeta : '');
+        if (eventSentence.length > 90) eventSentence = eventSentence.slice(0, 87) + '…';
+      }
+    }
+    // Fallback: derive from load/kpis (never blank)
+    if (!eventSentence) {
+      eventSentence = 'Fab drawing ' + kp.totalMW.toFixed(1) + ' MW' +
+        ' \xb7 overhead ' + kp.overheadRatio.toFixed(2) + '\xd7' +
+        ' \xb7 UPW ' + kp.upwResistivity.toFixed(1) + ' MΩ\xb7cm';
+    }
+    return moduleLabel + '  ▸  ' + eventSentence;
+  }
+
+  function demoUpdateCaption(frame) {
+    if (!demoOn || !refs.demoCaption) return;
+    // Rebuild the narration string at most ~2x/sec (plus immediately on module change) so
+    // the demo doesn't allocate a fresh caption string every frame while running.
+    demoCapFc++;
+    if (activeId === demoCapLastModule && (demoCapFc % 16) !== 0) return;
+    demoCapLastModule = activeId;
+    var text = demoBuildCaption(frame, activeId);
+    // Only update DOM text when it changed (avoids flicker).
+    if (refs.demoCaptionText.textContent !== text) {
+      refs.demoCaptionText.textContent = text;
+    }
+  }
+
   // ---- Alarm history ring buffer (closure-scope, NOT in frame) ----
   var HIST_N = 200;
   var histBuf = new Array(HIST_N);
@@ -31,6 +155,9 @@ window.BAS = window.BAS || {};
   }
 
   // ---- Area -> module resolver ----
+  // Cleanroom module is purely environmental (HVAC/FFU/ISO 14644) — no per-process
+  // or per-tool view. Process alarms from all areas (ETCH, WET, LITHO, etc.) are
+  // most useful in the Production Floor module, so all areas map to 'production'.
   var AREA_MODULE = {
     LITHO: 'production', ETCH: 'production', DIFF: 'production',
     IMPL: 'production', CMP: 'production', WET: 'production',
@@ -38,6 +165,27 @@ window.BAS = window.BAS || {};
   };
   function resolveModule(area) {
     return AREA_MODULE[area] || 'production';
+  }
+
+  // ---- Alarm-navigation helpers ----
+  // Flash the destination nav item briefly with an accent border to confirm navigation.
+  function navFlash(moduleId) {
+    var ni = refs.navItems && refs.navItems[moduleId];
+    if (!ni) return;
+    var item = ni.item;
+    item.classList.remove('flash');
+    // Force a reflow so removing+re-adding the class always restarts the animation.
+    void item.offsetWidth;
+    item.classList.add('flash');
+    // Cancel any prior flash timer BEFORE creating the new one (restart-safe on rapid clicks).
+    if (item._flashTid) clearTimeout(item._flashTid);
+    item._flashTid = setTimeout(function () { item.classList.remove('flash'); }, 700);
+  }
+
+  function navigateToAlarm(area) {
+    var moduleId = resolveModule(area);
+    location.hash = '#' + moduleId;
+    navFlash(moduleId);
   }
 
   // ---- Dropdown state ----
@@ -79,7 +227,31 @@ window.BAS = window.BAS || {};
     clock.setAttribute('aria-label', 'Simulation clock');
     top.appendChild(clock);
     refs.clock = clock.querySelector('#clk');
+
+    // demo / guided-mode toggle button
+    var demoBtn = el('button', 'demo-btn');
+    demoBtn.textContent = 'DEMO';
+    demoBtn.title = 'Guided demo mode — auto-rotates modules with live narration (D)';
+    demoBtn.setAttribute('aria-pressed', 'false');
+    demoBtn.addEventListener('click', function () { demoToggle(); });
+    top.appendChild(demoBtn);
+    refs.demoBtn = demoBtn;
+
     app.appendChild(top);
+
+    // demo caption strip — fixed, top-center just below the topbar (collision-free:
+    // replay-strip is at bottom:118px, cockpit is at the very bottom)
+    var demoCaption = el('div', 'demo-caption');
+    demoCaption.setAttribute('role', 'status');
+    demoCaption.setAttribute('aria-live', 'polite');
+    demoCaption.style.display = 'none';
+    var demoCaptionText = el('span', 'demo-caption-text');
+    demoCaptionText.textContent = 'Demo mode — live production → facility coupling';
+    demoCaption.appendChild(el('span', 'demo-caption-icon', '▶'));
+    demoCaption.appendChild(demoCaptionText);
+    document.body.appendChild(demoCaption);
+    refs.demoCaption = demoCaption;
+    refs.demoCaptionText = demoCaptionText;
 
     // alarm banner
     var banner = el('div', 'alarmbanner hidden');
@@ -123,9 +295,57 @@ window.BAS = window.BAS || {};
     rh.appendChild(el('span', 't', 'Event Stream'));
     var rate = el('span', 'rate', '0 evt/s'); rh.appendChild(rate);
     rail.appendChild(rh);
-    var stream = el('div', 'stream'); stream.title = 'Hover to pause the stream and read'; stream.setAttribute('aria-live', 'polite'); rail.appendChild(stream);
+
+    // Filter button strip — drives CSS container-class filtering on .stream
+    var filterBar = el('div', 'evt-filters');
+    filterBar.setAttribute('role', 'group');
+    filterBar.setAttribute('aria-label', 'Filter event stream');
+    var FILTERS = [
+      { label: 'All',     key: 'all' },
+      { label: 'Lot/Job', key: 'lotjob' },
+      { label: 'AMHS',    key: 'amhs' },
+      { label: 'FDC',     key: 'fdc' },
+      { label: 'Alarm',   key: 'alarm' }
+    ];
+    var activeFilter = 'all';
+    var filterBtns = [];
+    var stream = el('div', 'stream');
+
+    function applyFilter(key) {
+      if (key === activeFilter) return;   // no-op if the active filter is re-clicked
+      activeFilter = key;
+      stream.dataset.filter = key;
+      for (var fi = 0; fi < filterBtns.length; fi++) {
+        var isActive = (filterBtns[fi].dataset.fkey === key);
+        filterBtns[fi].classList.toggle('active', isActive);
+        filterBtns[fi].setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      }
+    }
+
+    (function () {
+      for (var fi = 0; fi < FILTERS.length; fi++) {
+        var fb = el('button', 'evt-filter-btn');
+        fb.textContent = FILTERS[fi].label;
+        fb.dataset.fkey = FILTERS[fi].key;
+        fb.setAttribute('aria-pressed', FILTERS[fi].key === 'all' ? 'true' : 'false');
+        if (FILTERS[fi].key === 'all') fb.classList.add('active');
+        (function (key) {
+          fb.addEventListener('click', function () { applyFilter(key); });
+        })(FILTERS[fi].key);
+        filterBtns.push(fb);
+        filterBar.appendChild(fb);
+      }
+    })();
+
+    rh.appendChild(filterBar);
+
+    stream.title = 'Hover to pause the stream and read'; stream.setAttribute('aria-live', 'polite');
+    stream.dataset.filter = 'all';
+    rail.appendChild(stream);
     body.appendChild(rail);
-    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3 }); // 3x slower than prior 2/s → ~1.5s/row
+    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3, // 3x slower than prior 2/s → ~1.5s/row
+      onAlarmClick: function (area) { navigateToAlarm(area); }
+    });
 
     app.appendChild(body);
 
@@ -142,13 +362,17 @@ window.BAS = window.BAS || {};
     activate(initial);
 
     window.addEventListener('keydown', function (e) {
-      if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;   // don't hijack browser shortcuts (Alt+←/→ Back/Fwd, Ctrl/Cmd+digit tab switch)
+      // D toggles demo from any focus context (including topbar button focus)
+      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); demoToggle(); return; }
+      if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
       if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
       else if (e.key === ',') { e.preventDefault(); BAS.clockSource.step(-1); }
       else if (e.key === '.') { e.preventDefault(); BAS.clockSource.step(1); }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
+        // Manual nav while demo is on — pause and schedule resume
+        if (demoOn) demoPauseForManualNav();
         var orderedIds = navOrder();
         var idx = orderedIds.indexOf(activeId);
         if (idx < 0) idx = 0;
@@ -158,13 +382,19 @@ window.BAS = window.BAS || {};
       } else if (e.key === 'Escape') {
         e.preventDefault();
         if (dropdownOpen) { closeDropdown(); return; }
+        if (demoOn) demoPauseForManualNav();
         location.hash = '#production';
       } else {
         var d = parseInt(e.key, 10);
-        // digits 1-8 only; cap matches current module count (extend if modules expand)
-        if (d >= 1 && d <= 8) {
+        // digits 1-9 only; cap matches current module count (extend if modules expand)
+        if (d >= 1 && d <= 9) {
           var ids = navOrder();
-          if (d - 1 < ids.length) { e.preventDefault(); location.hash = '#' + ids[d - 1]; }
+          if (d - 1 < ids.length) {
+            e.preventDefault();
+            // Manual nav while demo is on — pause and schedule resume
+            if (demoOn) demoPauseForManualNav();
+            location.hash = '#' + ids[d - 1];
+          }
         }
       }
     });
@@ -326,7 +556,14 @@ window.BAS = window.BAS || {};
     });
   }
 
-  function onHash() { activate((location.hash || '').replace('#', '')); }
+  function onHash() {
+    // Detect manual navigations (user clicked nav / typed hash) while demo is on
+    if (demoOn && !demoNavigating) {
+      demoPauseForManualNav();
+    }
+    demoNavigating = false;   // always clear after the hash change is processed
+    activate((location.hash || '').replace('#', ''));
+  }
 
   function activate(id) {
     var def = BAS.moduleById(id) || BAS.modules[0];
@@ -414,6 +651,9 @@ window.BAS = window.BAS || {};
     }
 
     if (refs.cockpit) refs.cockpit.update(frame);
+
+    // demo caption update (no-op when demo is off)
+    demoUpdateCaption(frame);
   }
 
   BAS.app = { build: build, update: function (f) { update(f); }, get active() { return activeId; } };

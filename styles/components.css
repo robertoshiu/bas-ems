@@ -74,10 +74,23 @@ canvas.spark { display:block; width:100%; }
 svg, svg text { font-family: var(--mono); }
 
 /* event ticker / stream */
-.eventrail .rail-h { display:flex; align-items:center; gap:8px; padding: 11px var(--s-3);
-  border-bottom:1px solid var(--line); }
+.eventrail .rail-h { display:flex; align-items:center; gap:8px; padding: 8px var(--s-3) 6px;
+  border-bottom:1px solid var(--line); flex-wrap:wrap; }
 .eventrail .rail-h .t { font-size: var(--fs-2); font-weight:600; text-transform:uppercase; letter-spacing:.05em; color: var(--text-dim); }
 .eventrail .rail-h .rate { margin-left:auto; font-family: var(--mono); font-size: var(--fs-1); color: var(--accent); }
+/* filter button group — lives on a second line under title+rate */
+.evt-filters { display:flex; flex-wrap:wrap; gap:4px; width:100%; margin-top:2px; }
+.evt-filter-btn { background: var(--bg-3); color: var(--text-dim); border:1px solid var(--line-2);
+  border-radius: 10px; font-family: var(--mono); font-size: var(--fs-0); padding: 2px 8px;
+  cursor:pointer; line-height:1.4; white-space:nowrap; }
+.evt-filter-btn:hover { color: var(--text); border-color: var(--line-3); }
+.evt-filter-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(100,178,255,.10); }
+/* container-class filter: hide non-matching rows (new rows auto-obey — no per-row JS) */
+.stream[data-filter="lotjob"] .evt:not(.cls-lot):not(.cls-job) { display:none; }
+.stream[data-filter="amhs"]   .evt:not(.cls-amhs)              { display:none; }
+.stream[data-filter="fdc"]    .evt:not(.cls-fdc)               { display:none; }
+.stream[data-filter="alarm"]  .evt:not(.cls-alarm)             { display:none; }
+/* data-filter="all" hides nothing */
 .stream { flex:1; overflow:hidden; padding: 4px 0; }
 .evt { display:grid; grid-template-columns: 52px 1fr; gap: 8px; padding: 4px var(--s-3); font-size: var(--fs-1);
   border-left: 2px solid transparent; }
@@ -91,6 +104,7 @@ svg, svg text { font-family: var(--mono); }
 .evt.cls-amhs { border-left-color: var(--c-amhs); } .evt.cls-amhs .ty { color: var(--c-amhs); }
 .evt.cls-fdc { border-left-color: var(--c-fdc); } .evt.cls-fdc .ty { color: var(--c-fdc); }
 .evt.cls-alarm { border-left-color: var(--c-alarm); background: rgba(255,93,108,.06); } .evt.cls-alarm .ty { color: var(--c-alarm); }
+.evt.clickable-alarm { cursor: pointer; } .evt.clickable-alarm:hover { background: rgba(255,93,108,.12); }
 .evt.cls-state { border-left-color: var(--c-state); }
 .evt.enter { animation: evtIn .28s ease; }
 @keyframes evtIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform:none; } }
@@ -195,6 +209,9 @@ svg, svg text { font-family: var(--mono); }
 .livefab-tooltip .lft-k { color: var(--text-mut); }
 .livefab-tooltip .lft-v { color: var(--text); font-weight: 600; }
 
+/* trend / historian charts */
+canvas.trend-chart { display:block; width:100%; cursor:default; }
+
 /* misc */
 .dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
 .right { text-align: right; } .nowrap { white-space: nowrap; }
@@ -206,8 +223,47 @@ svg, svg text { font-family: var(--mono); }
 .big-read { font-family: var(--mono); font-size: var(--fs-7); color: var(--accent); line-height:1; }
 .flash-up { animation: flashUp .5s ease; } @keyframes flashUp { from{color:var(--good)} }
 
+/* nav-item flash: briefly highlight the destination nav item on alarm navigation */
+@keyframes navFlash {
+  0%   { box-shadow: 0 0 0 2px var(--accent), inset 0 0 0 1px var(--accent); border-color: var(--accent); }
+  60%  { box-shadow: 0 0 0 2px var(--accent), inset 0 0 0 1px var(--accent); border-color: var(--accent); }
+  100% { box-shadow: none; border-color: transparent; }
+}
+.navitem.flash { animation: navFlash 0.65s ease forwards; }
+
+/* demo / guided-mode button (lives in topbar, near the clock) */
+.demo-btn {
+  background: var(--bg-3); color: var(--text-dim);
+  border: 1px solid var(--line-2); border-radius: 4px;
+  font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .10em;
+  padding: 3px 10px; cursor: pointer; margin-left: var(--s-2);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.demo-btn:hover { color: var(--text); border-color: var(--line-3); }
+.demo-btn.active, .demo-btn[aria-pressed="true"] {
+  color: var(--accent); border-color: var(--accent);
+  background: rgba(100,178,255,.12);
+}
+
+/* demo caption strip — fixed top-center just below the 50px topbar.
+   Collision-free: replay-strip is at bottom:118px; cockpit at very bottom. */
+.demo-caption {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  top: 54px; z-index: 45;
+  display: flex; align-items: center; gap: 8px;
+  max-width: 72vw; padding: 7px 16px;
+  background: rgba(12,17,26,.95); border: 1px solid var(--accent);
+  border-radius: 8px; font-family: var(--mono); font-size: var(--fs-2);
+  color: var(--text); box-shadow: var(--shadow);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+.demo-caption .demo-caption-icon { color: var(--accent); flex-shrink: 0; }
+.demo-caption .demo-caption-text { overflow: hidden; text-overflow: ellipsis; }
+
 /* respect reduced-motion: kill decorative CSS animation/transition (live JS data still updates) */
 @media (prefers-reduced-motion: reduce) {
-  .simmark .dot, .evt.enter, .flash-up { animation: none !important; }
+  .simmark .dot, .evt.enter, .flash-up, .navitem.flash { animation: none !important; }
+  .demo-caption { transition: none !important; }
   * { transition-duration: 0.01ms !important; }
 }
