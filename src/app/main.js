@@ -12,7 +12,7 @@ window.BAS = window.BAS || {};
 
     var clock = BAS.clock;
     function frameLoop() {
-      var t = clock.now();
+      var t = (BAS.clockSource ? BAS.clockSource.now() : clock.now());
       var frame = BAS.sim.frame(t);
       BAS.app.update(frame);
       requestAnimationFrame(frameLoop);
