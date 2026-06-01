@@ -115,6 +115,8 @@ svg, svg text { font-family: var(--mono); }
 .tl-pill.replay { color:var(--accent-2); border:1px solid rgba(58,157,255,.4); }
 .tl-spacer { flex:1; }
 .tl-canvas { display:block; width:100%; cursor:ew-resize; margin-top:6px; }
+.tl-select { background:var(--bg-3); color:var(--text-dim); border:1px solid var(--line-2); border-radius:4px;
+  font-family:var(--mono); font-size:var(--fs-0); padding:1px 4px; }
 
 /* misc */
 .dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
