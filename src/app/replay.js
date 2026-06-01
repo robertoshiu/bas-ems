@@ -57,5 +57,9 @@ window.BAS = window.BAS || {};
     document.body.appendChild(stripEl);
   }
 
+  // If the clock leaves replay by any path (user scrub / play-pause / step / natural end),
+  // tear down the replay UI so a stale caption + highlight can't linger over a live timeline.
+  BAS.clockSource.onChange(function (m) { if (active && m !== 'replay') stop(); });
+
   BAS.replay = { start: start, stop: stop, get active() { return active; }, _window: _window, _captions: _captions };
 })(window.BAS);

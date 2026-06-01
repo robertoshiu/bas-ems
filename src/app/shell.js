@@ -87,8 +87,8 @@ window.BAS = window.BAS || {};
     window.addEventListener('keydown', function (e) {
       if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
       if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
-      else if (e.key === ',') { BAS.clockSource.step(-1); }
-      else if (e.key === '.') { BAS.clockSource.step(1); }
+      else if (e.key === ',') { e.preventDefault(); BAS.clockSource.step(-1); }
+      else if (e.key === '.') { e.preventDefault(); BAS.clockSource.step(1); }
     });
   }
 
