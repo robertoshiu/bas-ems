@@ -77,7 +77,7 @@ svg, svg text { font-family: var(--mono); }
 .eventrail .rail-h { display:flex; align-items:center; gap:8px; padding: 8px var(--s-3) 6px;
   border-bottom:1px solid var(--line); flex-wrap:wrap; }
 .eventrail .rail-h .t { font-size: var(--fs-2); font-weight:600; text-transform:uppercase; letter-spacing:.05em; color: var(--text-dim); }
-.eventrail .rail-h .rate { font-family: var(--mono); font-size: var(--fs-1); color: var(--accent); }
+.eventrail .rail-h .rate { margin-left:auto; font-family: var(--mono); font-size: var(--fs-1); color: var(--accent); }
 /* filter button group — lives on a second line under title+rate */
 .evt-filters { display:flex; flex-wrap:wrap; gap:4px; width:100%; margin-top:2px; }
 .evt-filter-btn { background: var(--bg-3); color: var(--text-dim); border:1px solid var(--line-2);

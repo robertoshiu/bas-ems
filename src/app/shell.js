@@ -140,6 +140,7 @@ window.BAS = window.BAS || {};
     var stream = el('div', 'stream');
 
     function applyFilter(key) {
+      if (key === activeFilter) return;   // no-op if the active filter is re-clicked
       activeFilter = key;
       stream.dataset.filter = key;
       for (var fi = 0; fi < filterBtns.length; fi++) {
