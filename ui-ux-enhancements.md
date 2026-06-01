@@ -213,6 +213,19 @@ Max Concurrent: 6 (Wave 1 & 2)
 
 ## TODOs
 
+> ### Post-Cockpit Reconciliation (2026-06-01)
+> This plan predates the now-shipped **Timeline Cockpit** (bottom scrub/replay time-machine:
+> `clock-source.js`, `timeline-data.js`, `timeline.js`, `replay.js`). Reconciled before execution:
+> - **CORE BUILD SET (this pass):** Tasks **1, 2, 3, 6, 7, 8, 9, 10** — the expert-convincing core
+>   (SVG P&ID schematics + UPW excursions + livefab tooltips + keyboard nav + ARIA + alarm expansion).
+> - **Task 4 (Loop Progress Indicator) — ⛔ DROPPED.** Superseded by the cockpit's playhead + 180 s
+>   lane strip, which already shows loop position, richer. Do NOT build.
+> - **Task 3 (Keyboard Nav):** `shell.js` ALREADY has a keydown handler binding Space / `,` / `.` to
+>   the cockpit transport — coexist, do not clobber (see Task 3 Must-NOT-do).
+> - **Deferred (not this pass):** T5 favicon (optional), T11 filtering, T12 sparklines, T13
+>   alarm-navigate (reconcile alarm-click vs cockpit replay first), T14 sustainability, T15–18 tail,
+>   T19 Trends (must REUSE `BAS.ui.timelineData`, never re-sample `frame()`), T20 Demo (must showcase scrub/replay).
+
 - [ ] 1. Create SVG Schematic Utility Module (`src/ui/schematic.js`)
 
   **What to do**:
@@ -427,6 +440,11 @@ Max Concurrent: 6 (Wave 1 & 2)
   **Must NOT do**:
   - Do not add keyboard shortcuts that conflict with browser defaults (Ctrl+, Alt+)
   - Do not add focus trapping (keep it simple)
+  - **Do not bind Space, `,` (comma), or `.` (period).** `shell.js` ALREADY has a keydown handler
+    (in `build`) binding those to the Timeline Cockpit transport (`BAS.clockSource.togglePlay` /
+    `step(-1)` / `step(+1)`). EXTEND that existing handler (preferred) — or add a second listener —
+    for Left/Right arrows, digits 1-8, and Escape only. Preserve its `input|textarea|button` target
+    guard. Do NOT remove, replace, or override the existing transport bindings.
 
   **Recommended Agent Profile**:
   - **Category**: `quick`
@@ -498,7 +516,7 @@ Max Concurrent: 6 (Wave 1 & 2)
   - Message: `feat(shell): add keyboard navigation (arrow keys, number keys, Escape)`
   - Files: `src/app/shell.js`
 
-- [ ] 4. Loop Progress Indicator
+- [ ] 4. Loop Progress Indicator — ⛔ DROPPED (superseded by Timeline Cockpit playhead + 180s strip; do NOT build)
 
   **What to do**:
   - Add a thin progress bar below the clock in the topbar
