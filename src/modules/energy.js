@@ -62,7 +62,7 @@
       demandCanvas.style.height = '96px'; demandCanvas.style.width = '100%';
       demandP._body.appendChild(demandCanvas);
       grid.appendChild(demandP);
-      demandSpark = U.Sparkline(demandCanvas, { n: 240, height: 96, color: U.cssVar('--accent'), fill: true });
+      demandSpark = U.Sparkline(demandCanvas, { n: 240, height: 96, color: U.cssVar('--accent'), fill: true, slow: 9 }); // 3x slower than the global 3x
 
       // ---- (2b) Demand Detail ----------------------------------------------
       var detP = U.panel('Demand Detail', { cls: 'col-4' });

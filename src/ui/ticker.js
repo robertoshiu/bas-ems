@@ -54,7 +54,7 @@ window.BAS = window.BAS || {};
     // released at most rowsPerSec; alarms/FDC always show; the counter keeps
     // reporting the real (high) throughput so it still reads as "nonstop".
     var minGapMs = 1000 / (opts.rowsPerSec || 3);
-    var emaRate = 0, lastMs = null, lastRoutineMs = -1e9, paused = false;
+    var emaRate = 0, lastMs = null, lastRoutineMs = -1e9, paused = false, lastRateMs = -1e9;
 
     // Pause-on-hover so a reader can stop the stream and actually read a row.
     streamEl.addEventListener('mouseenter', function () { paused = true; });
@@ -88,7 +88,12 @@ window.BAS = window.BAS || {};
         }
         lastMs = nowMs;
         if (paused) { if (rateEl) rateEl.textContent = '❚❚ paused'; return; }
-        if (rateEl) rateEl.textContent = (emaRate ? emaRate.toFixed(0) : '0') + ' evt/s';
+        // Throttle the evt/s readout to ~1s so the number is calm/readable (the EMA
+        // still tracks every frame; only the display cadence is slowed).
+        if (rateEl && nowMs - lastRateMs > 1000) {
+          lastRateMs = nowMs;
+          rateEl.textContent = (emaRate ? emaRate.toFixed(0) : '0') + ' evt/s';
+        }
 
         var hms = sim ? sim.hms : '00:00:00';
         var admittedRoutine = false; // at most one routine row per frame

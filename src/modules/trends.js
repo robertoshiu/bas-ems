@@ -181,8 +181,8 @@
       ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(PAD_L, pyv); ctx.lineTo(PAD_L + pw, pyv); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,120,135,0.92)';
-      ctx.font = '10px ' + MONO;
+      ctx.fillStyle = 'rgba(255,120,135,0.82)';
+      ctx.font = '9px ' + MONO;
       ctx.textAlign = 'right';
       ctx.fillText('peak ' + s.peakMW.toFixed(1), PAD_L + pw - 2, pyv - 3);
     }
@@ -235,16 +235,16 @@
       ctx.fillText(xLabels[xi] + 'm', xpos, PAD_T + ph + 13);
     }
 
-    // Min / Avg / Max annotations (bottom strip) — readable size + contrast
-    ctx.font = '11px ' + MONO;
+    // Min / Avg / Max annotations (bottom strip) — readable but thin (not heavy/blurry)
+    ctx.font = '10px ' + MONO;
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(214,224,240,0.72)';
+    ctx.fillStyle = 'rgba(205,216,234,0.62)';
     ctx.fillText('min ' + formatVal(ch.min, s.unit), PAD_L, h - 7);
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(236,243,255,0.92)';
+    ctx.fillStyle = 'rgba(226,235,250,0.8)';
     ctx.fillText('avg ' + formatVal(ch.avg, s.unit), PAD_L + pw * 0.5, h - 7);
     ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(214,224,240,0.72)';
+    ctx.fillStyle = 'rgba(205,216,234,0.62)';
     ctx.fillText('max ' + formatVal(ch.max, s.unit), PAD_L + pw, h - 7);
 
     ch.offscreen = oc;

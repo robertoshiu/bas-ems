@@ -116,7 +116,7 @@
       gasYardSch = U.Schematic(schP._body, {
         nodes: GY_NODES,
         pipes: GY_PIPES,
-        width: 520, height: 230
+        width: 520, height: 230, fontScale: 0.8
       });
       grid.appendChild(schP);
 

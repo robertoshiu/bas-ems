@@ -48,6 +48,7 @@ window.BAS = window.BAS || {};
     var pipes = opts.pipes || [];
     var vw = opts.width  || 300;
     var vh = opts.height || 160;
+    var fontScale = opts.fontScale || 1;   // shrink node label/value text per schematic
 
     // ---- Build SVG root ------------------------------------------------
     var root = U.svg('svg', {
@@ -150,7 +151,7 @@ window.BAS = window.BAS || {};
         x: nd.x + NODE_W / 2,
         y: nd.y + NODE_H / 2 - 3,
         'text-anchor': 'middle',
-        'font-size': '6.5'
+        'font-size': (6.5 * fontScale).toFixed(2)
       });
       labelEl.textContent = nd.label || nd.id;
       root.appendChild(labelEl);
@@ -159,7 +160,7 @@ window.BAS = window.BAS || {};
         x: nd.x + NODE_W / 2,
         y: nd.y + NODE_H / 2 + 8,
         'text-anchor': 'middle',
-        'font-size': '8',
+        'font-size': (8 * fontScale).toFixed(2),
         'class': 'val'
       });
       valEl.textContent = '';
