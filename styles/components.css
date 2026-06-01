@@ -126,6 +126,42 @@ svg, svg text { font-family: var(--mono); }
   font-family:var(--mono); font-size:var(--fs-2); color:var(--text); box-shadow:var(--shadow); }
 @media (prefers-reduced-motion: reduce) { .replay-strip { transition:none; } }
 
+/* living-fab canvas hover tooltip */
+.livefab-tooltip {
+  position: fixed;
+  z-index: 200;
+  pointer-events: none;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: var(--fs-1);
+  color: var(--text);
+  box-shadow: 0 4px 18px rgba(0,0,0,.55);
+  min-width: 160px;
+  max-width: 240px;
+  white-space: nowrap;
+}
+.livefab-tooltip .lft-title {
+  font-size: var(--fs-2);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line-2);
+}
+.livefab-tooltip .lft-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.livefab-tooltip .lft-k { color: var(--text-mut); }
+.livefab-tooltip .lft-v { color: var(--text); font-weight: 600; }
+
 /* misc */
 .dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
 .right { text-align: right; } .nowrap { white-space: nowrap; }
