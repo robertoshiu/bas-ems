@@ -209,6 +209,80 @@ ok('throttle skips update on non-4th frame', dashBefore === dashAfter,
 
 // ---- API presence checks -----------------------------------------------
 ok('BAS.ui.Schematic exported', typeof BAS.ui.Schematic === 'function');
+ok('Schematic returns root SVG element', sch.root !== undefined && sch.root._tag === 'svg');
+
+// ---- Fix: seam-free wrap — dashOffset stays bounded in [-PERIOD, 0] -------
+// PERIOD = DASH_LEN + DASH_GAP = 8 + 6 = 14.
+// Drive 60 accepted frames (tick=4,8,...,240) with chVal=500 (step=0.7/frame).
+// After many wraps the dashOffset must remain in [-14, 0] and must never be
+// exactly 0 after the first frame (ruling out a hard reset-to-zero clamp).
+var DASH_PERIOD_TEST = 14;
+var containerW = domStub.createElement('div');
+var schW = BAS.ui.Schematic(containerW, {
+  nodes: [
+    { id: 'P', label: 'P', x: 10, y: 10 },
+    { id: 'Q', label: 'Q', x: 150, y: 10 }
+  ],
+  pipes: [{ from: 'P', to: 'Q', channel: 'wCh' }]
+});
+var svgRootW = containerW._children[0];
+var flowElsW = collectByClass(svgRootW, 'flow');
+var flowElW = flowElsW[0];
+var wrapBounded = true, wrapNeverHardReset = true, sawWrap = false;
+for (var wt = 1; wt <= 60; wt++) {
+  schW.update({ load: { wCh: 500 }, tick: wt * 4 });
+  var dv = flowElW._attrs['stroke-dashoffset'];
+  if (dv !== undefined) {
+    var dvNum = parseFloat(dv);
+    if (dvNum < -DASH_PERIOD_TEST || dvNum > 0) { wrapBounded = false; }
+    // After the 20th frame (enough steps to cross -14 at least once), dashOffset
+    // should not have been hard-reset to exactly 0 while still advancing.
+    if (wt > 20 && dvNum === 0) { wrapNeverHardReset = false; sawWrap = true; }
+  }
+}
+ok('dashOffset stays bounded in [-PERIOD, 0] over 60 accepted frames', wrapBounded,
+   'PERIOD=' + DASH_PERIOD_TEST);
+ok('dashOffset never hard-resets to exactly 0 after wrap threshold crossed', wrapNeverHardReset);
+
+// ---- Fix: zero channel value treated as real zero (not missing) --------
+// A node with channel='zCh' whose frame.load['zCh'] = 0 should trigger
+// the change-gate (write textContent) when going from the initial NaN state.
+// A node with channel='zCh' whose frame.load has no 'zCh' key also results
+// in chVal=0 — but the important guarantee is that both paths write '' and
+// the write fires once on first update (NaN -> 0 transition).
+var containerZ = domStub.createElement('div');
+var schZ = BAS.ui.Schematic(containerZ, {
+  nodes: [
+    { id: 'Z', label: 'Z', x: 10, y: 10, channel: 'zCh' }
+  ],
+  pipes: []
+});
+var svgRootZ = containerZ._children[0];
+var valElsZ = collectByClass(svgRootZ, 'val');
+var zValEl = valElsZ[0];
+var zWriteCount = 0;
+var _zLast = zValEl.textContent;
+Object.defineProperty(zValEl, 'textContent', {
+  get: function () { return _zLast; },
+  set: function (v) { zWriteCount++; _zLast = v; }
+});
+// First call: channel present with value 0 — should trigger a write (NaN -> 0)
+schZ.update({ load: { zCh: 0 }, tick: 4 });
+ok('channel value 0 triggers write (NaN -> 0 transition)', zWriteCount >= 1,
+   'writes=' + zWriteCount);
+// Second call: same value 0 — should NOT write again (change-gate holds)
+var zWriteAfterFirst = zWriteCount;
+schZ.update({ load: { zCh: 0 }, tick: 8 });
+ok('channel value 0 unchanged does not re-write (change-gate)', zWriteCount === zWriteAfterFirst,
+   'writes=' + zWriteCount);
+// Now absent key: chVal defaults to 0, same as last — change-gate should suppress write
+schZ.update({ load: {}, tick: 12 });
+ok('absent channel key (defaults to 0) does not re-write when last was 0', zWriteCount === zWriteAfterFirst,
+   'writes=' + zWriteCount);
+// Non-zero value: triggers a write
+schZ.update({ load: { zCh: 42 }, tick: 16 });
+ok('channel value 42 after 0 triggers write', zWriteCount > zWriteAfterFirst,
+   'writes=' + zWriteCount);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail > 0 ? 1 : 0);

@@ -38,7 +38,7 @@ window.BAS = window.BAS || {};
    *   .pipes  Array of {from, to, channel} — connections driven by frame.load[channel]
    *   .width  SVG viewBox width  (default 300)
    *   .height SVG viewBox height (default 160)
-   * @returns {{ update(frame) }}
+   * @returns {{ update(frame), root: SVGSVGElement }}
    */
   U.Schematic = function (container, opts) {
     opts = opts || {};
@@ -121,7 +121,7 @@ window.BAS = window.BAS || {};
       });
       root.appendChild(arrow);
 
-      pipeRefs.push({ bg: bg, flow: flow, channel: p.channel, dashOffset: 0 });
+      pipeRefs.push({ bg: bg, flow: flow, channel: p.channel, dashOffset: 0, lastDashInt: 0 });
     }
 
     // ---- Build node boxes -----------------------------------------------
@@ -171,6 +171,7 @@ window.BAS = window.BAS || {};
     var ref = null;      // pipe ref scratch
     var nRef = null;     // node ref scratch
     var fmtVal = '';     // formatted string scratch (only written when value changes)
+    var newDashInt = 0;  // scratch for integer dashoffset comparison
 
     // ---- update(frame) --------------------------------------------------
     function update(frame) {
@@ -181,11 +182,16 @@ window.BAS = window.BAS || {};
       for (var pi = 0; pi < pipeCount; pi++) {
         ref = pipeRefs[pi];
         if (!ref) continue;
-        chVal = (frame.load && frame.load[ref.channel]) ? frame.load[ref.channel] : 0;
-        // Accumulate dashoffset proportional to channel value; wrap within period
+        chVal = (frame.load && frame.load[ref.channel] != null) ? frame.load[ref.channel] : 0;
+        // Accumulate dashoffset proportional to channel value; seam-free modulo wrap
         ref.dashOffset = ref.dashOffset - chVal * FLOW_SCALE;
-        if (ref.dashOffset < -DASH_MAX * 200) ref.dashOffset = 0; // prevent overflow
-        ref.flow.setAttribute('stroke-dashoffset', ref.dashOffset.toFixed(2));
+        if (ref.dashOffset < -DASH_PERIOD) ref.dashOffset += DASH_PERIOD;
+        // Change-gate: only call toFixed+setAttribute when integer dashoffset changes
+        newDashInt = ref.dashOffset | 0;
+        if (newDashInt !== ref.lastDashInt) {
+          ref.lastDashInt = newDashInt;
+          ref.flow.setAttribute('stroke-dashoffset', ref.dashOffset.toFixed(2));
+        }
       }
 
       // Update node value labels.
@@ -197,12 +203,12 @@ window.BAS = window.BAS || {};
         chVal = 0;
         if (nRef.channel) {
           // Fix 2: per-node explicit channel — supports terminal/sink nodes with no outgoing pipe
-          chVal = (frame.load && frame.load[nRef.channel]) ? frame.load[nRef.channel] : 0;
+          chVal = (frame.load && frame.load[nRef.channel] != null) ? frame.load[nRef.channel] : 0;
         } else {
           // Fallback: first pipe where this node is the source
           for (var pj = 0; pj < pipeCount; pj++) {
             if (pipeRefs[pj] && pipes[pj].from === nRef.id) {
-              chVal = (frame.load && frame.load[pipeRefs[pj].channel]) ? frame.load[pipeRefs[pj].channel] : 0;
+              chVal = (frame.load && frame.load[pipeRefs[pj].channel] != null) ? frame.load[pipeRefs[pj].channel] : 0;
               break;
             }
           }
