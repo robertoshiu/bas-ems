@@ -98,11 +98,44 @@ svg, svg text { font-family: var(--mono); }
 /* alarm banner */
 .alarmbanner { display:flex; align-items:center; gap: var(--s-3); padding: 7px var(--s-4);
   background: linear-gradient(90deg, rgba(255,47,84,.16), rgba(255,47,84,.04)); border-bottom:1px solid rgba(255,47,84,.4);
-  font-size: var(--fs-2); }
+  font-size: var(--fs-2); user-select:none; }
 .alarmbanner.hidden { display:none; }
 .alarmbanner .ic { color: var(--crit); }
 .alarmbanner .msg { font-family: var(--mono); color: var(--text); }
 .alarmbanner .cnt { margin-left:auto; color: var(--bad); font-family: var(--mono); }
+.alarmbanner .banner-chevron { color: var(--text-mut); font-size: var(--fs-1); margin-left: var(--s-2); transition: transform .18s ease; }
+.alarmbanner[aria-expanded="true"] .banner-chevron { transform: rotate(180deg); }
+.alarmbanner:hover { background: linear-gradient(90deg, rgba(255,47,84,.22), rgba(255,47,84,.07)); }
+
+/* alarm dropdown */
+.alarm-dropdown { position:relative; z-index:100; background: var(--bg-2); border:1px solid rgba(255,47,84,.35);
+  border-top:none; max-height:360px; display:flex; flex-direction:column; overflow:hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,.55); }
+.alarm-dd-hdr { display:flex; align-items:center; padding: 7px var(--s-4); border-bottom:1px solid var(--line);
+  background: rgba(255,47,84,.07); gap: var(--s-2); }
+.alarm-dd-title { font-size: var(--fs-2); font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+  color: var(--bad); font-family: var(--mono); flex:1; }
+.alarm-dd-btns { display:flex; gap: var(--s-2); align-items:center; }
+.history-btn { background: var(--bg-3); color: var(--text-dim); border:1px solid var(--line-2); border-radius:4px;
+  font-family: var(--mono); font-size: var(--fs-1); padding: 2px 10px; cursor:pointer; }
+.history-btn:hover { color: var(--text); border-color: var(--line-3); }
+.alarm-dd-close { background: transparent; color: var(--text-mut); border:none; font-size: var(--fs-3);
+  cursor:pointer; padding: 0 4px; line-height:1; }
+.alarm-dd-close:hover { color: var(--bad); }
+.alarm-dd-list { overflow-y:auto; flex:1; }
+.alarm-dd-empty { padding: 14px var(--s-4); color: var(--text-mut); font-family: var(--mono); font-size: var(--fs-2); }
+.alarm-row { display:grid; grid-template-columns: 56px 72px 1fr 100px 64px; gap: var(--s-3);
+  align-items:center; padding: 7px var(--s-4); border-bottom:1px solid var(--line); font-size: var(--fs-2); cursor:pointer; }
+.alarm-row:last-child { border-bottom:none; }
+.alarm-row:hover { background: rgba(255,255,255,.03); }
+.hist-row { cursor:default; opacity:.85; }
+.hist-row:hover { background: rgba(255,255,255,.015); }
+.alarm-sev-badge { font-family: var(--mono); font-size: var(--fs-0); font-weight:700; letter-spacing:.08em;
+  padding: 1px 6px; border-radius:3px; background: rgba(255,255,255,.05); border:1px solid currentColor; }
+.alarm-alid { font-family: var(--mono); color: var(--text-dim); font-size: var(--fs-1); }
+.alarm-text { color: var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.alarm-tool { font-family: var(--mono); color: var(--text-mut); font-size: var(--fs-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.alarm-area { font-family: var(--mono); color: var(--accent); font-size: var(--fs-1); text-align:right; }
 
 /* timeline cockpit */
 .tl-transport { display:flex; align-items:center; gap:10px; height:22px; }

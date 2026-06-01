@@ -9,6 +9,40 @@ window.BAS = window.BAS || {};
   var refs = {}, mounted = {}, activeId = null, ticker = null;
   var GROUP_ORDER = ['Operations', 'BAS', 'EMS', 'Master Data'];
 
+  // ---- Alarm history ring buffer (closure-scope, NOT in frame) ----
+  var HIST_N = 200;
+  var histBuf = new Array(HIST_N);
+  var histHead = 0, histCount = 0;
+  var prevActiveAlids = {};   // alid -> true; tracks set-transition dedup
+
+  function histPush(entry) {
+    histBuf[histHead] = entry;
+    histHead = (histHead + 1) % HIST_N;
+    if (histCount < HIST_N) histCount++;
+  }
+
+  // Returns array of history entries newest-first
+  function histSnapshot() {
+    var out = [];
+    for (var i = histCount - 1; i >= 0; i--) {
+      out.push(histBuf[(histHead - 1 - i + HIST_N) % HIST_N]);
+    }
+    return out;
+  }
+
+  // ---- Area -> module resolver ----
+  var AREA_MODULE = {
+    LITHO: 'production', ETCH: 'production', DIFF: 'production',
+    IMPL: 'production', CMP: 'production', WET: 'production',
+    THIN: 'production', METRO: 'production'
+  };
+  function resolveModule(area) {
+    return AREA_MODULE[area] || 'production';
+  }
+
+  // ---- Dropdown state ----
+  var dropdownOpen = false;
+
   function build(root) {
     var app = el('div', 'app');
 
@@ -50,9 +84,28 @@ window.BAS = window.BAS || {};
     // alarm banner
     var banner = el('div', 'alarmbanner hidden');
     banner.setAttribute('role', 'alert');
-    banner.innerHTML = '<span class="ic">&#9650;</span><span class="msg"></span><span class="cnt"></span>';
+    banner.setAttribute('aria-expanded', 'false');
+    banner.style.cursor = 'pointer';
+    banner.innerHTML = '<span class="ic">&#9650;</span><span class="msg"></span><span class="cnt"></span><span class="banner-chevron">&#9660;</span>';
     app.appendChild(banner);
     refs.banner = banner; refs.bannerMsg = banner.querySelector('.msg'); refs.bannerCnt = banner.querySelector('.cnt');
+
+    // alarm dropdown panel
+    var dropdown = el('div', 'alarm-dropdown');
+    dropdown.style.display = 'none';
+    app.appendChild(dropdown);
+    refs.dropdown = dropdown;
+
+    banner.addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggleDropdown();
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!dropdownOpen) return;
+      if (banner.contains(e.target) || dropdown.contains(e.target)) return;
+      closeDropdown();
+    });
 
     // body
     var body = el('div', 'body');
@@ -104,6 +157,7 @@ window.BAS = window.BAS || {};
         location.hash = '#' + orderedIds[idx];
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        if (dropdownOpen) { closeDropdown(); return; }
         location.hash = '#production';
       } else {
         var d = parseInt(e.key, 10);
@@ -114,6 +168,132 @@ window.BAS = window.BAS || {};
         }
       }
     });
+  }
+
+  // ---- Dropdown helpers ----
+  function openDropdown() {
+    dropdownOpen = true;
+    refs.banner.setAttribute('aria-expanded', 'true');
+    refs.dropdown.style.display = '';
+    renderDropdown(false);
+  }
+
+  function closeDropdown() {
+    dropdownOpen = false;
+    refs.banner.setAttribute('aria-expanded', 'false');
+    refs.dropdown.style.display = 'none';
+  }
+
+  function toggleDropdown() {
+    if (dropdownOpen) closeDropdown(); else openDropdown();
+  }
+
+  // currentAlarms is the latest frame.alarms snapshot stored for rendering
+  var latestAlarms = [];
+  var showingHistory = false;
+
+  function renderDropdown(histMode) {
+    showingHistory = !!histMode;
+    var dd = refs.dropdown;
+    dd.innerHTML = '';
+
+    // header row
+    var hdr = el('div', 'alarm-dd-hdr');
+    var title = el('span', 'alarm-dd-title', histMode ? 'Alarm History' : 'Active Alarms');
+    hdr.appendChild(title);
+
+    var btns = el('div', 'alarm-dd-btns');
+    if (!histMode) {
+      var histBtn = el('button', 'history-btn');
+      histBtn.textContent = 'History';
+      histBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        renderDropdown(true);
+      });
+      btns.appendChild(histBtn);
+    } else {
+      var backBtn = el('button', 'history-btn');
+      backBtn.textContent = 'Active';
+      backBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        renderDropdown(false);
+      });
+      btns.appendChild(backBtn);
+    }
+    var closeBtn = el('button', 'alarm-dd-close');
+    closeBtn.innerHTML = '&#10005;';
+    closeBtn.title = 'Close';
+    closeBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeDropdown();
+    });
+    btns.appendChild(closeBtn);
+    hdr.appendChild(btns);
+    dd.appendChild(hdr);
+
+    var list = el('div', 'alarm-dd-list');
+
+    if (!histMode) {
+      // Active alarms
+      if (!latestAlarms.length) {
+        var empty = el('div', 'alarm-dd-empty', 'No active alarms');
+        list.appendChild(empty);
+      } else {
+        for (var i = 0; i < latestAlarms.length; i++) {
+          list.appendChild(buildAlarmRow(latestAlarms[i], false));
+        }
+      }
+    } else {
+      // History rows
+      var snap = histSnapshot();
+      if (!snap.length) {
+        var emptyH = el('div', 'alarm-dd-empty', 'No alarm history yet');
+        list.appendChild(emptyH);
+      } else {
+        for (var j = 0; j < snap.length; j++) {
+          list.appendChild(buildHistRow(snap[j]));
+        }
+      }
+    }
+
+    dd.appendChild(list);
+  }
+
+  function buildAlarmRow(alarm, isHist) {
+    var row = el('div', 'alarm-row');
+    if (!isHist) {
+      row.addEventListener('click', function (e) {
+        e.stopPropagation();
+        location.hash = '#' + resolveModule(alarm.area);
+        closeDropdown();
+      });
+    }
+    var sevBadge = el('span', 'alarm-sev-badge sev-' + (alarm.sev || 'INFO'), alarm.sev || 'INFO');
+    row.appendChild(sevBadge);
+    var alid = el('span', 'alarm-alid', alarm.alid || '');
+    row.appendChild(alid);
+    var txt = el('span', 'alarm-text', alarm.text || '');
+    row.appendChild(txt);
+    var tool = el('span', 'alarm-tool', alarm.tool || '');
+    row.appendChild(tool);
+    var area = el('span', 'alarm-area', alarm.area || '');
+    row.appendChild(area);
+    return row;
+  }
+
+  function buildHistRow(entry) {
+    var row = el('div', 'alarm-row hist-row');
+    var sevBadge = el('span', 'alarm-sev-badge sev-' + (entry.sev || 'INFO'), entry.sev || 'INFO');
+    row.appendChild(sevBadge);
+    var alid = el('span', 'alarm-alid', entry.alid || '');
+    row.appendChild(alid);
+    var txt = el('span', 'alarm-text', entry.text || '');
+    row.appendChild(txt);
+    var tool = el('span', 'alarm-tool', entry.tool || '');
+    row.appendChild(tool);
+    var area = el('span', 'alarm-area', entry.area || '');
+    row.appendChild(area);
+    return row;
   }
 
   function navOrder() {
@@ -177,14 +357,42 @@ window.BAS = window.BAS || {};
     refs.hk.moves.textContent = U.group(Math.round(kp.wpmh));
     refs.hk.peak.textContent = kp.demandPct.toFixed(0) + '%';
 
-    // alarm banner
+    // alarm banner + ring buffer
     var al = frame.alarms;
+    latestAlarms = al;
+
+    // detect set-transitions for history ring buffer (only push on new appearance)
+    var currentAlids = {};
+    for (var ai = 0; ai < al.length; ai++) {
+      var alarm = al[ai];
+      currentAlids[alarm.alid] = true;
+      if (!prevActiveAlids[alarm.alid]) {
+        // newly appeared — push into history
+        histPush({
+          alid: alarm.alid,
+          text: alarm.text,
+          tool: alarm.tool,
+          area: alarm.area,
+          sev: alarm.sev,
+          setT: alarm.set != null ? alarm.set : frame.t,
+          clearT: alarm.clear != null ? alarm.clear : null
+        });
+      }
+    }
+    prevActiveAlids = currentAlids;
+
     if (al.length) {
       refs.banner.classList.remove('hidden');
       var worst = al[al.length - 1];
       refs.bannerMsg.textContent = 'ALID ' + worst.alid + ' — ' + worst.text + ' @ ' + worst.tool;
       refs.bannerCnt.textContent = al.length + ' active alarm' + (al.length > 1 ? 's' : '');
-    } else refs.banner.classList.add('hidden');
+    } else {
+      refs.banner.classList.add('hidden');
+      if (dropdownOpen) closeDropdown();
+    }
+
+    // keep dropdown content fresh if open
+    if (dropdownOpen) renderDropdown(showingHistory);
 
     // nav badges (active alarms per module's area-set: only Production gets the count here)
     var pcount = al.length;
