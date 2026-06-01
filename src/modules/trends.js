@@ -22,6 +22,7 @@
   // Constants (resolved lazily in mount, after BAS.sim.init())
   var PERIOD = 180;    // real seconds per loop (= BAS.clock.PERIOD)
   var N_SAMPLES = 240; // grid points across [0, PERIOD)
+  var EMPTY_DASH = []; // shared "solid line" dash, reused in update() (no per-frame alloc)
 
   // Series definitions — order matters for layout
   var SERIES = [
@@ -90,7 +91,10 @@
     for (var i = 0; i < N_SAMPLES; i++) {
       var t = i / N_SAMPLES * PERIOD;
       var samp = load.sample(t);
-      // For UPW resistivity: replicate frame()'s exact formula
+      // UPW resistivity: EXACT replica of sim.js frame() (search 'upwResistivity' in
+      // src/engine/sim.js — the source of truth). load.sample does NOT expose it.
+      // _trends_test.mjs asserts diff=0 vs frame(), so an engine formula change fails
+      // the test instead of silently drifting this curve.
       var tick = CK.tickOf(t);
       var upwR = 18.20 + (BAS.prng.rand('upwR', tick) - 0.5) * 0.03;
 
@@ -335,7 +339,7 @@
         var xCursor = ch.PAD_L + xProg * pw;
         ctx.strokeStyle = 'rgba(255,255,255,0.55)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([]);
+        ctx.setLineDash(EMPTY_DASH);
         ctx.beginPath();
         ctx.moveTo(xCursor, ch.PAD_T);
         ctx.lineTo(xCursor, ch.PAD_T + (h - ch.PAD_T - ch.PAD_B));
