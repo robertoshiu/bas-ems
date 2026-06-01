@@ -123,7 +123,52 @@ window.BAS = window.BAS || {};
     rh.appendChild(el('span', 't', 'Event Stream'));
     var rate = el('span', 'rate', '0 evt/s'); rh.appendChild(rate);
     rail.appendChild(rh);
-    var stream = el('div', 'stream'); stream.title = 'Hover to pause the stream and read'; stream.setAttribute('aria-live', 'polite'); rail.appendChild(stream);
+
+    // Filter button strip — drives CSS container-class filtering on .stream
+    var filterBar = el('div', 'evt-filters');
+    filterBar.setAttribute('role', 'group');
+    filterBar.setAttribute('aria-label', 'Filter event stream');
+    var FILTERS = [
+      { label: 'All',     key: 'all' },
+      { label: 'Lot/Job', key: 'lotjob' },
+      { label: 'AMHS',    key: 'amhs' },
+      { label: 'FDC',     key: 'fdc' },
+      { label: 'Alarm',   key: 'alarm' }
+    ];
+    var activeFilter = 'all';
+    var filterBtns = [];
+    var stream = el('div', 'stream');
+
+    function applyFilter(key) {
+      activeFilter = key;
+      stream.dataset.filter = key;
+      for (var fi = 0; fi < filterBtns.length; fi++) {
+        var isActive = (filterBtns[fi].dataset.fkey === key);
+        filterBtns[fi].classList.toggle('active', isActive);
+        filterBtns[fi].setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      }
+    }
+
+    (function () {
+      for (var fi = 0; fi < FILTERS.length; fi++) {
+        var fb = el('button', 'evt-filter-btn');
+        fb.textContent = FILTERS[fi].label;
+        fb.dataset.fkey = FILTERS[fi].key;
+        fb.setAttribute('aria-pressed', FILTERS[fi].key === 'all' ? 'true' : 'false');
+        if (FILTERS[fi].key === 'all') fb.classList.add('active');
+        (function (key) {
+          fb.addEventListener('click', function () { applyFilter(key); });
+        })(FILTERS[fi].key);
+        filterBtns.push(fb);
+        filterBar.appendChild(fb);
+      }
+    })();
+
+    rh.appendChild(filterBar);
+
+    stream.title = 'Hover to pause the stream and read'; stream.setAttribute('aria-live', 'polite');
+    stream.dataset.filter = 'all';
+    rail.appendChild(stream);
     body.appendChild(rail);
     ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3 }); // 3x slower than prior 2/s → ~1.5s/row
 
