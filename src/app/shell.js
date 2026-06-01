@@ -42,12 +42,14 @@ window.BAS = window.BAS || {};
 
     var clock = el('div', 'clock');
     clock.innerHTML = '<span class="d">SHIFT&nbsp;</span><span id="clk">00:00:00</span>';
+    clock.setAttribute('aria-label', 'Simulation clock');
     top.appendChild(clock);
     refs.clock = clock.querySelector('#clk');
     app.appendChild(top);
 
     // alarm banner
     var banner = el('div', 'alarmbanner hidden');
+    banner.setAttribute('role', 'alert');
     banner.innerHTML = '<span class="ic">&#9650;</span><span class="msg"></span><span class="cnt"></span>';
     app.appendChild(banner);
     refs.banner = banner; refs.bannerMsg = banner.querySelector('.msg'); refs.bannerCnt = banner.querySelector('.cnt');
@@ -55,6 +57,7 @@ window.BAS = window.BAS || {};
     // body
     var body = el('div', 'body');
     var nav = el('div', 'navrail'); refs.nav = nav;
+    nav.setAttribute('role', 'tablist');
     buildNav(nav);
     body.appendChild(nav);
 
@@ -67,7 +70,7 @@ window.BAS = window.BAS || {};
     rh.appendChild(el('span', 't', 'Event Stream'));
     var rate = el('span', 'rate', '0 evt/s'); rh.appendChild(rate);
     rail.appendChild(rh);
-    var stream = el('div', 'stream'); stream.title = 'Hover to pause the stream and read'; rail.appendChild(stream);
+    var stream = el('div', 'stream'); stream.title = 'Hover to pause the stream and read'; stream.setAttribute('aria-live', 'polite'); rail.appendChild(stream);
     body.appendChild(rail);
     ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3 }); // 3x slower than prior 2/s → ~1.5s/row
 
@@ -130,6 +133,8 @@ window.BAS = window.BAS || {};
       if (m.group !== lastGroup) { nav.appendChild(el('div', 'nav-sec', m.group)); lastGroup = m.group; }
       var it = el('div', 'navitem');
       it.setAttribute('role', 'tab');
+      it.id = 'tab-' + m.id;
+      it.setAttribute('aria-selected', 'false');
       it.innerHTML = U.icon(m.icon) + '<span class="label">' + m.title + '</span>';
       var badge = el('span', 'badge-n'); badge.style.display = 'none'; it.appendChild(badge);
       it.addEventListener('click', function () { location.hash = '#' + m.id; });
@@ -155,9 +160,10 @@ window.BAS = window.BAS || {};
     for (var nid in refs.navItems) {
       var ni = refs.navItems[nid].item;
       ni.classList.toggle('active', nid === id);
-      if (nid === id) { ni.setAttribute('aria-current', 'page'); }
-      else { ni.removeAttribute('aria-current'); }
+      if (nid === id) { ni.setAttribute('aria-current', 'page'); ni.setAttribute('aria-selected', 'true'); }
+      else { ni.removeAttribute('aria-current'); ni.setAttribute('aria-selected', 'false'); }
     }
+    refs.content.setAttribute('aria-labelledby', 'tab-' + id);
     refs.content.scrollTop = 0;
   }
 

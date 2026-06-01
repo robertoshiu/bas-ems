@@ -26,6 +26,7 @@ window.BAS = window.BAS || {};
   };
 
   BAS.ui.LiveFab = function (canvas) {
+    canvas.setAttribute('aria-label', 'Living fab visualization showing production events driving facility load');
     var POOL = 460;
     var px = new Float32Array(POOL), py = new Float32Array(POOL), pp = new Float32Array(POOL),
       psp = new Float32Array(POOL), ptx = new Float32Array(POOL), pty = new Float32Array(POOL),
