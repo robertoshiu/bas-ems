@@ -65,7 +65,7 @@
           { from: 'edi',    to: 'polish', channel: 'upwFlow' },
           { from: 'polish', to: 'pou',    channel: 'upwFlow' }
         ],
-        width: 520, height: 70
+        width: 520, height: 70, fontScale: 0.8
       });
       grid.appendChild(schP);
 

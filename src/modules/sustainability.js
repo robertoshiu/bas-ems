@@ -107,13 +107,13 @@
       var c1 = el('canvas', 'spark'); c1.style.height = '120px';
       scP._body.appendChild(c1);
       grid.appendChild(scP);
-      spkCO2 = U.Sparkline(c1, { height: 120, color: U.cssVar('--accent') });
+      spkCO2 = U.Sparkline(c1, { height: 120, color: U.cssVar('--accent'), slow: 9 }); // 3x slower than the global 3x
 
       var srP = U.panel('Renewable Mix — Trailing', { cls: 'col-4', bodyCls: 'flush' });
       var c2 = el('canvas', 'spark'); c2.style.height = '120px';
       srP._body.appendChild(c2);
       grid.appendChild(srP);
-      spkRen = U.Sparkline(c2, { height: 120, color: U.cssVar('--good') });
+      spkRen = U.Sparkline(c2, { height: 120, color: U.cssVar('--good'), slow: 9 }); // 3x slower than the global 3x
 
       // ---- targets / context panel ------------------------------------
       var tgP = U.panel('Decarbonization Targets', { cls: 'col-4' });

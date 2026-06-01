@@ -197,7 +197,7 @@
     var c = el('canvas', 'spark'); c.style.height = '46px';
     wrap.appendChild(c);
     body.appendChild(wrap);
-    return U.Sparkline(c, { color: color, height: 46, fill: true });
+    return U.Sparkline(c, { color: color, height: 46, fill: true, slow: 15 }); // ~5x slower than the global 3x
   }
 
   // ---- helpers ---------------------------------------------------------
