@@ -5,6 +5,11 @@
  * oxidizers. Acid exhaust + abatement track Etch/Wet; solvent tracks Thin Film;
  * N2 demand tracks Diffusion via frame.load.n2Flow. All shimmer is jitter off
  * frame.tick -> deterministic and loop-identical.
+ *
+ * Part A: Gas yard SVG schematic (bulk tanks -> headers -> scrubbers/oxidizers).
+ * Part B: Production-coupled cabinet states — state derives deterministically
+ *   from frame.areaStates[area].Productive/total + P.rand(channel, frame.tick).
+ *   No Math.random, no wall-clock. Loop-identical at every t.
  */
 (function (BAS) {
   'use strict';
@@ -16,6 +21,8 @@
   var bulkTbl, exHdrTbl, scrubTbl, oxTbl, cabTbl;
   // sparklines + their canvases
   var spAcid, spAbate, spN2;
+  // gas yard schematic
+  var gasYardSch;
   var fc = 0;
 
   // ---- static per-asset character (deterministic, doesn't shimmer) -------
@@ -42,6 +49,53 @@
     { key: 'Solvent',  chan: 'exSolCFM',  dp: 520, seg: 'solvent' }
   ];
 
+  // Map each cabinet index (0-9) to its process area (for production coupling).
+  // SiH4/BCl3/Cl2/HBr/NF3 are Etch gases; NH3 is Diffusion; WF6 is Thin Film.
+  var CABINET_AREA = ['ETCH', 'DIFF', 'THIN', 'ETCH', 'ETCH', 'ETCH', 'ETCH', 'ETCH', 'ETCH', 'ETCH'];
+
+  // Deterministic production-coupled cabinet state.
+  // Derives state from area's productive fraction + per-cabinet hash of frame.tick.
+  // High productive fraction -> higher probability of Online; no randomness.
+  // Returns 'Online' | 'Purge' | 'Standby'.
+  function cabinetState(cabId, areaId, frame) {
+    var as = frame.areaStates[areaId];
+    var prodFrac = as ? (as.Productive / as.total) : 0.5;
+    // Per-cabinet, per-tick deterministic value [0,1)
+    var rv = P.rand('gh:cabst:' + cabId, frame.tick);
+    // Online threshold scales from ~55% at 0% productive to ~95% at 100% productive
+    var onlineThr = 0.55 + prodFrac * 0.40;
+    // Purge band is a narrow slice just above the Online threshold
+    var purgeThr  = onlineThr + 0.08;
+    if (rv < onlineThr)  return 'Online';
+    if (rv < purgeThr)   return 'Purge';
+    return 'Standby';
+  }
+
+  // Gas yard schematic layout: bulk tanks -> main N2 header -> scrubbers/oxidizers.
+  // Coordinates (viewBox 520 x 200).
+  var GY_NODES = [
+    // Bulk tanks (left column)
+    { id: 'n2',    label: 'N2 Bulk',  x: 60,  y: 40,  channel: 'n2Flow' },
+    { id: 'o2',    label: 'O2 Bulk',  x: 60,  y: 90,  channel: null },
+    { id: 'ar',    label: 'Ar Bulk',  x: 60,  y: 140, channel: null },
+    { id: 'h2',    label: 'H2 Bulk',  x: 60,  y: 190, channel: null },
+    // Main distribution header (centre)
+    { id: 'hdr',   label: 'Gas Hdr',  x: 220, y: 100, channel: 'n2Flow' },
+    // Exhaust treatment (right column)
+    { id: 'scrb',  label: 'Scrubber', x: 380, y: 70,  channel: 'exAcidCFM' },
+    { id: 'tox',   label: 'Oxidizer', x: 380, y: 155, channel: 'exAcidCFM' }
+  ];
+  var GY_PIPES = [
+    // Bulk tanks -> main header (flow proportional to n2Flow)
+    { from: 'n2',  to: 'hdr', channel: 'n2Flow' },
+    { from: 'o2',  to: 'hdr', channel: 'n2Flow' },
+    { from: 'ar',  to: 'hdr', channel: 'n2Flow' },
+    { from: 'h2',  to: 'hdr', channel: 'n2Flow' },
+    // Header -> exhaust treatment (flow proportional to exAcidCFM)
+    { from: 'hdr', to: 'scrb', channel: 'exAcidCFM' },
+    { from: 'hdr', to: 'tox',  channel: 'exAcidCFM' }
+  ];
+
   BAS.registerModule({
     id: 'gas-exhaust', title: 'Gas & Exhaust', group: 'BAS', order: 4, icon: 'gas',
     mount: function (root) {
@@ -52,6 +106,17 @@
       root.appendChild(head);
 
       var grid = el('div', 'grid');
+
+      // ---- (1) Gas Yard Schematic ----------------------------------------
+      // Bulk storage -> Distribution Headers -> Exhaust Treatment
+      var schP = U.panel('Gas Yard — Bulk Storage → Distribution → Exhaust Treatment',
+        { cls: 'col-12', bodyCls: 'flush', meta: 'GAS \xb7 BACnet', metaId: 'gh-schmeta' });
+      gasYardSch = U.Schematic(schP._body, {
+        nodes: GY_NODES,
+        pipes: GY_PIPES,
+        width: 520, height: 230
+      });
+      grid.appendChild(schP);
 
       // ---- (2) Top KPI strip --------------------------------------------
       var kpiP = U.panel('Gas & Abatement Overview', { cls: 'col-12', bodyCls: 'tight' });
@@ -155,6 +220,9 @@
       var acidLoadFrac = clamp((exAcid - 86000) / 18000, 0, 1);   // 0..1 over the loop band
       var avgEff = 99.35 - acidLoadFrac * 0.22 + U.jitter('gh:eff', tk, 0.04);
 
+      // ---- Gas yard schematic (every frame — Schematic throttles internally) -
+      gasYardSch.update(frame);
+
       // ---- KPIs ----------------------------------------------------------
       kN2.set(U.group(Math.round(n2)), { delta: U.fmt.delta((n2 - 14000) / 140, 1, '%'), dir: n2 >= 14000 ? 'up' : 'down' });
       kEx.set((totalCFM / 1000).toFixed(1), { delta: U.fmt.delta((totalCFM - 415000) / 4150, 1, '%'), dir: totalCFM >= 415000 ? 'up' : 'down' });
@@ -218,11 +286,14 @@
           };
         }));
 
-        // (5) Specialty gas cabinets
+        // (5) Specialty gas cabinets — production-coupled, deterministic states.
+        // State derives from frame.areaStates[area].Productive/total + P.rand(id, tick).
+        // No Math.random. Identical for same frame.tick on every loop pass.
         cabTbl.set(M.facility.gasCabinets.map(function (c, i) {
           var gas = CABINET_GAS[i % CABINET_GAS.length];
-          // Deterministic state per cabinet: mostly Online, a couple Purge/Standby.
-          var state = P.pickWeighted('gh:cabst:' + c.id, 0, ['Online', 'Purge', 'Standby'], [8, 1.5, 1.5]);
+          var area = CABINET_AREA[i % CABINET_AREA.length];
+          var state = cabinetState(c.id, area, frame);
+          // Cylinder % is stable (changes slowly via jitter off tick, not per-second)
           var cyl = clamp(20 + P.rand('gh:cyl:' + c.id, 0) * 70 + U.jitter('gh:cylj:' + c.id, tk, 0.3), 4, 99);
           var mtorr = state === 'Online' ? Math.round(760 + U.jitter('gh:cmt:' + c.id, tk, 8)) : 0;
           var purge = state === 'Purge' ? Math.round(2000 + U.jitter('gh:cpg:' + c.id, tk, 40))
