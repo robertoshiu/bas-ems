@@ -71,12 +71,25 @@ window.BAS = window.BAS || {};
     ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 });
 
     app.appendChild(body);
+
+    // bottom time-machine cockpit
+    var cockpit = el('div', 'cockpit');
+    app.appendChild(cockpit);
+    refs.cockpit = BAS.ui.TimelineCockpit(cockpit);
+
     root.appendChild(app);
 
     // routing
     window.addEventListener('hashchange', onHash);
     var initial = (location.hash || '').replace('#', '') || (BAS.modules[0] && BAS.modules[0].id);
     activate(initial);
+
+    window.addEventListener('keydown', function (e) {
+      if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
+      if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
+      else if (e.key === ',') { BAS.clockSource.step(-1); }
+      else if (e.key === '.') { BAS.clockSource.step(1); }
+    });
   }
 
   function buildNav(nav) {
@@ -150,6 +163,8 @@ window.BAS = window.BAS || {};
     if (def && def.update && mounted[activeId] && mounted[activeId].style.display !== 'none') {
       try { def.update(frame); } catch (e) { if (window.console) console.error(e); }
     }
+
+    if (refs.cockpit) refs.cockpit.update(frame);
   }
 
   BAS.app = { build: build, update: function (f) { update(f); }, get active() { return activeId; } };

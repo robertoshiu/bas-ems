@@ -14,6 +14,10 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, function (_, src) {
   return '<script>\n/* ' + src + ' */\n' + readFileSync(src, 'utf8') + '\n</script>';
 });
 
+['BAS.clockSource', 'BAS.ui.timelineData', 'BAS.ui.TimelineCockpit'].forEach(function (sym) {
+  if (html.indexOf(sym) === -1) { throw new Error('build-single: ' + sym + ' missing from bundle — check index.html includes'); }
+});
+
 writeFileSync('bas-ems.html', html);
 const kb = (Buffer.byteLength(html, 'utf8') / 1024).toFixed(0);
 console.log('wrote bas-ems.html (' + kb + ' KB, fully self-contained)');

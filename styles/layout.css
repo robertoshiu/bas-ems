@@ -88,6 +88,9 @@ body::before { /* faint engineering grid */
 .view-head .crumb { color: var(--text-mut); font-size: var(--fs-2); font-family: var(--mono); }
 .view-head .right { margin-left: auto; color: var(--text-mut); font-size: var(--fs-2); }
 
+.cockpit { flex: 0 0 auto; background: var(--bg-1); border-top: 1px solid var(--line-2); }
+.cockpit-inner { padding: 6px 10px 8px; }
+
 /* scrollbars */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }

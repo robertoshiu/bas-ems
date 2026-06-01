@@ -103,6 +103,19 @@ svg, svg text { font-family: var(--mono); }
 .alarmbanner .msg { font-family: var(--mono); color: var(--text); }
 .alarmbanner .cnt { margin-left:auto; color: var(--bad); font-family: var(--mono); }
 
+/* timeline cockpit */
+.tl-transport { display:flex; align-items:center; gap:10px; height:22px; }
+.tl-btn { background:var(--bg-3); color:var(--text-dim); border:1px solid var(--line-2); border-radius:4px;
+  font-family:var(--mono); font-size:var(--fs-1); padding:1px 8px; cursor:pointer; }
+.tl-btn:hover { color:var(--text); border-color:var(--line-3); }
+.tl-clock { font-family:var(--mono); font-size:var(--fs-2); color:var(--accent); letter-spacing:1px; }
+.tl-pill { font-family:var(--mono); font-size:var(--fs-0); padding:1px 7px; border-radius:10px; letter-spacing:.1em; }
+.tl-pill.live { color:var(--good); border:1px solid rgba(52,211,153,.4); }
+.tl-pill.paused { color:var(--warn); border:1px solid rgba(245,183,61,.4); }
+.tl-pill.replay { color:var(--accent-2); border:1px solid rgba(58,157,255,.4); }
+.tl-spacer { flex:1; }
+.tl-canvas { display:block; width:100%; cursor:ew-resize; margin-top:6px; }
+
 /* misc */
 .dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
 .right { text-align: right; } .nowrap { white-space: nowrap; }
