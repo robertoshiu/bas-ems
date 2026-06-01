@@ -43,6 +43,7 @@ window.BAS = window.BAS || {};
     // ---- cached static layer (lanes drawn once) ----
     var staticC = document.createElement('canvas'), staticW = 0, staticH = 0, dpr = 1;
     var COL_ACCENT = U.cssVar('--accent'), COL_WARN = U.cssVar('--warn'), COL_BAD = U.cssVar('--bad');
+    var COL_HILITE = U.hexA(U.cssVar('--accent-2'), .12);
     function xToT(px) { return Math.max(0, Math.min(data.P - 0.001, (px / canvas._w) * data.P)); }
     function tToX(t) { return (t / data.P) * canvas._w; }
 
@@ -129,7 +130,7 @@ window.BAS = window.BAS || {};
       // highlight band for active replay window
       if (hi) {
         var hx = tToX(hi.setT - 8 < 0 ? 0 : hi.setT - 8), hw = ((hi.clearT - hi.setT) + 13) / data.P * w;
-        ctx.fillStyle = U.hexA(U.cssVar('--accent-2'), .12); ctx.fillRect(hx, 0, hw, h);
+        ctx.fillStyle = COL_HILITE; ctx.fillRect(hx, 0, hw, h);
       }
       // hover crosshair
       if (hoverX >= 0) { ctx.strokeStyle = 'rgba(180,200,230,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hoverX, 0); ctx.lineTo(hoverX, h); ctx.stroke(); }
