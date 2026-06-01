@@ -211,8 +211,6 @@ svg, svg text { font-family: var(--mono); }
 
 /* trend / historian charts */
 canvas.trend-chart { display:block; width:100%; cursor:default; }
-.trend-chart-label { font-size: var(--fs-1); color: var(--text-mut); font-family: var(--mono);
-  letter-spacing:.04em; margin-bottom: 3px; }
 
 /* misc */
 .dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
