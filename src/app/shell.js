@@ -87,6 +87,7 @@ window.BAS = window.BAS || {};
 
     window.addEventListener('keydown', function (e) {
       if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;   // don't hijack browser shortcuts (Alt+←/→ Back/Fwd, Ctrl/Cmd+digit tab switch)
       if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
       else if (e.key === ',') { e.preventDefault(); BAS.clockSource.step(-1); }
       else if (e.key === '.') { e.preventDefault(); BAS.clockSource.step(1); }
@@ -103,6 +104,7 @@ window.BAS = window.BAS || {};
         location.hash = '#production';
       } else {
         var d = parseInt(e.key, 10);
+        // digits 1-8 only; cap matches current module count (extend if modules expand)
         if (d >= 1 && d <= 8) {
           var ids = navOrder();
           if (d - 1 < ids.length) { e.preventDefault(); location.hash = '#' + ids[d - 1]; }
