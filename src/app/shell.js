@@ -14,6 +14,8 @@ window.BAS = window.BAS || {};
   var demoTimer = null;       // rotation setInterval id
   var demoIdleTimer = null;   // idle-resume setTimeout id
   var demoNavigating = false; // true only while demo writes location.hash
+  var demoCapFc = 0;          // caption rebuild throttle counter
+  var demoCapLastModule = null;
   // Respect prefers-reduced-motion
   var reducedMotion = (typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -24,9 +26,12 @@ window.BAS = window.BAS || {};
     var ids = navOrder();
     var idx = ids.indexOf(activeId);
     var next = ids[(idx + 1) % ids.length];
+    if (next === activeId) return;   // no different module to advance to — a no-op hash write
+                                     // fires no hashchange, which would leave demoNavigating stuck true
     demoNavigating = true;
     location.hash = '#' + next;
-    // demoNavigating cleared in onHash (after activate)
+    // demoNavigating cleared in onHash (after activate); the guard above guarantees the
+    // hash actually changes, so onHash always fires and clears the flag.
   }
 
   function demoStartTimer() {
@@ -116,8 +121,13 @@ window.BAS = window.BAS || {};
 
   function demoUpdateCaption(frame) {
     if (!demoOn || !refs.demoCaption) return;
+    // Rebuild the narration string at most ~2x/sec (plus immediately on module change) so
+    // the demo doesn't allocate a fresh caption string every frame while running.
+    demoCapFc++;
+    if (activeId === demoCapLastModule && (demoCapFc % 16) !== 0) return;
+    demoCapLastModule = activeId;
     var text = demoBuildCaption(frame, activeId);
-    // Only update DOM text when it changed (avoids flicker at 60 Hz)
+    // Only update DOM text when it changed (avoids flicker).
     if (refs.demoCaptionText.textContent !== text) {
       refs.demoCaptionText.textContent = text;
     }
