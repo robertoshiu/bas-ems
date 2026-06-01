@@ -47,7 +47,7 @@ window.BAS = window.BAS || {};
       rep = { startT: startT, endT: endT, rate: rate == null ? 1.5 : rate, wall0: wall(), onTick: onTick, onEnd: onEnd };
       mode = 'replay'; emit();
     },
-    onChange: function (cb) { listeners.push(cb); },
+    onChange: function (cb) { listeners.push(cb); return function () { var i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); }; },
     _setWall: function (fn) { _wall = fn; }
   };
 })(window.BAS);

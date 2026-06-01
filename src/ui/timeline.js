@@ -5,10 +5,10 @@
 window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
-  var U = BAS.ui, el = U.el, CS = null;
+  var U = BAS.ui, el = U.el;
 
   BAS.ui.TimelineCockpit = function (container) {
-    CS = BAS.clockSource;
+    var CS = BAS.clockSource;
     var data = U.timelineData.get();
     var collapsed = false, hoverX = -1;
 
@@ -28,7 +28,7 @@ window.BAS = window.BAS || {};
 
     // ---- cached static layer (lanes drawn once) ----
     var staticC = document.createElement('canvas'), staticW = 0, staticH = 0, dpr = 1;
-    function laneRect() { return { x: 0, y: 0, w: canvas._w, h: canvas._h }; }
+    var COL_ACCENT = U.cssVar('--accent'), COL_WARN = U.cssVar('--warn');
     function xToT(px) { return Math.max(0, Math.min(data.P - 0.001, (px / canvas._w) * data.P)); }
     function tToX(t) { return (t / data.P) * canvas._w; }
 
@@ -46,10 +46,10 @@ window.BAS = window.BAS || {};
         if (i === 0) s.moveTo(x, y); else s.lineTo(x, y);
       }
       s.lineTo(w, h); s.lineTo(0, h); s.closePath();
-      s.fillStyle = U.hexA(U.cssVar('--accent'), .14); s.fill();
+      s.fillStyle = U.hexA(COL_ACCENT, .14); s.fill();
       s.beginPath();
       for (var j = 0; j < N; j++) { var x2 = j / (N - 1) * w, y2 = h - 4 - ((data.demand[j] - data.minMW) / range) * (h - 10); if (j === 0) s.moveTo(x2, y2); else s.lineTo(x2, y2); }
-      s.strokeStyle = U.cssVar('--accent'); s.lineWidth = 1; s.stroke();
+      s.strokeStyle = COL_ACCENT; s.lineWidth = 1; s.stroke();
       staticW = w; staticH = h;
     }
 
@@ -60,9 +60,9 @@ window.BAS = window.BAS || {};
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(staticC, 0, 0, w, h);
       // playhead
-      var px = tToX(frame.t);
-      ctx.strokeStyle = CS.isLive() ? U.cssVar('--accent') : U.cssVar('--warn');
-      ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+      var headX = tToX(frame.t);
+      ctx.strokeStyle = CS.isLive() ? COL_ACCENT : COL_WARN;
+      ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(headX, 0); ctx.lineTo(headX, h); ctx.stroke();
       // hover crosshair
       if (hoverX >= 0) { ctx.strokeStyle = 'rgba(180,200,230,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hoverX, 0); ctx.lineTo(hoverX, h); ctx.stroke(); }
     }
@@ -70,15 +70,17 @@ window.BAS = window.BAS || {};
     // ---- input ----
     var dragging = false;
     function px(e) { var r = canvas.getBoundingClientRect(); return e.clientX - r.left; }
+    function onMove(e) { if (dragging) CS.scrubTo(xToT(px(e))); }
+    function onUp() { if (dragging) { dragging = false; CS.resume(); } }
     canvas.addEventListener('mousedown', function (e) { dragging = true; CS.scrubTo(xToT(px(e))); });
-    window.addEventListener('mousemove', function (e) { if (dragging) CS.scrubTo(xToT(px(e))); });
-    window.addEventListener('mouseup', function () { if (dragging) { dragging = false; CS.resume(); } });
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
     canvas.addEventListener('mousemove', function (e) { hoverX = px(e); });
     canvas.addEventListener('mouseleave', function () { hoverX = -1; });
     playBtn.addEventListener('click', function () { CS.togglePlay(); });
     chevron.addEventListener('click', function () { collapsed = !collapsed; chevron.textContent = collapsed ? '▴' : '▾'; staticW = -1; });
 
-    CS.onChange(function (mode) {
+    var offChange = CS.onChange(function (mode) {
       pill.className = 'tl-pill ' + mode; pill.textContent = mode.toUpperCase();
       playBtn.textContent = (mode === 'live') ? '❚❚' : '▶';
     });
@@ -86,7 +88,12 @@ window.BAS = window.BAS || {};
     return {
       update: function (frame) { clock.textContent = frame.sim.hms; render(frame); },
       setTool: function () {},     // Task 6
-      destroy: function () { container.removeChild(root); }
+      destroy: function () {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        offChange();
+        container.removeChild(root);
+      }
     };
   };
 })(window.BAS);
