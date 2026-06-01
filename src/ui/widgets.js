@@ -38,8 +38,10 @@ window.BAS = window.BAS || {};
     var fill = opts.fill !== false;
     var fixedMin = opts.min, fixedMax = opts.max;
     var height = opts.height || 44;
+    var slow = opts.slow || 3;   // record 1 of every `slow` pushes -> trend scrolls ~3x slower
+    var pushFc = 0;
     return {
-      push: function (v) { buf[head] = v; head = (head + 1) % n; if (count < n) count++; },
+      push: function (v) { pushFc++; if (pushFc % slow !== 0) return; buf[head] = v; head = (head + 1) % n; if (count < n) count++; },
       render: function () {
         var ctx = U.fitCanvas(canvas, height);
         var w = canvas._w, h = canvas._h;

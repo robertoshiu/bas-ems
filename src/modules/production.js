@@ -30,7 +30,7 @@
       logStream.title = 'Hover to pause the stream and read';
       logP._body.appendChild(logStream);
       grid.appendChild(logP);
-      logTicker = U.Ticker(logStream, { showAll: true, maxRows: 16, rowsPerSec: 1, rateEl: logP._head.querySelector('.meta') }); // 3x slower than prior 3/s → ~1s/row
+      logTicker = U.Ticker(logStream, { showAll: true, maxRows: 16, rowsPerSec: 1 / 3, rateEl: logP._head.querySelector('.meta') }); // 3x slower again → ~3s/row
 
       // OEE gauges
       var oeeP = U.panel('Fab Equipment Effectiveness (E79 OEE)', { cls: 'col-4' });
@@ -79,9 +79,15 @@
       livefab.update(frame);
       logTicker.push(frame.newEvents, frame.sim);
 
+      // Engine emits a constant fleet OEE; add a small deterministic, loop-periodic
+      // ripple (smooth sines over the loop) so the E79 gauges visibly breathe.
+      // View-only and seam-free — each sin returns to its start at t = PERIOD.
       var oee = frame.kpis.oee;
-      gA.set(oee.availability * 100); gP.set(oee.performance * 100);
-      gQ.set(oee.quality * 100); gO.set(oee.oee * 100);
+      var ph = frame.t / BAS.clock.PERIOD * 6.2831853;
+      var av = oee.availability * 100 + 1.3 * Math.sin(ph * 3);
+      var pf = oee.performance  * 100 + 2.0 * Math.sin(ph * 2 + 1.1);
+      var ql = oee.quality      * 100 + 0.7 * Math.sin(ph * 5 + 2.3);
+      gA.set(av); gP.set(pf); gQ.set(ql); gO.set(av * pf * ql / 10000);
 
       if (fc % 8 === 0) {
         var jobs = frame.model.activeJobsAt(frame.t).slice(0, 14);

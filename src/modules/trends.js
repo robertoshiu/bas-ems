@@ -143,7 +143,8 @@
     var ctx = oc.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    var PAD_T = 18, PAD_B = 26, PAD_L = 6, PAD_R = 6;
+    var PAD_T = 18, PAD_B = 34, PAD_L = 6, PAD_R = 6;
+    var MONO = U.cssVar('--mono') || 'monospace';
     var pw = w - PAD_L - PAD_R;
     var ph = h - PAD_T - PAD_B;
 
@@ -180,8 +181,8 @@
       ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(PAD_L, pyv); ctx.lineTo(PAD_L + pw, pyv); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,93,108,0.75)';
-      ctx.font = '9px monospace';
+      ctx.fillStyle = 'rgba(255,120,135,0.92)';
+      ctx.font = '10px ' + MONO;
       ctx.textAlign = 'right';
       ctx.fillText('peak ' + s.peakMW.toFixed(1), PAD_L + pw - 2, pyv - 3);
     }
@@ -223,29 +224,28 @@
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Min / Avg / Max annotations (bottom strip)
-    ctx.font = '9px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    var fmt = formatVal(ch.min, s.unit);
-    ctx.fillText('min ' + fmt, PAD_L, h - 5);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('avg ' + formatVal(ch.avg, s.unit), PAD_L + pw * 0.5, h - 5);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.fillText('max ' + formatVal(ch.max, s.unit), PAD_L + pw, h - 5);
-
-    // X-axis tick labels: 0, 15, 30, 45, 60 min
-    ctx.fillStyle = 'rgba(255,255,255,0.20)';
-    ctx.font = '8px monospace';
+    // X-axis tick labels: 0, 15, 30, 45, 60 min (above the min/avg/max strip)
+    ctx.fillStyle = 'rgba(190,202,222,0.5)';
+    ctx.font = '9px ' + MONO;
     var xLabels = [0, 15, 30, 45, 60];
     for (var xi = 0; xi < xLabels.length; xi++) {
       var xprog = xLabels[xi] / 60;
       var xpos = PAD_L + xprog * pw;
       ctx.textAlign = xi === 0 ? 'left' : xi === xLabels.length - 1 ? 'right' : 'center';
-      ctx.fillText(xLabels[xi] + 'm', xpos, PAD_T + ph + 14);
+      ctx.fillText(xLabels[xi] + 'm', xpos, PAD_T + ph + 13);
     }
+
+    // Min / Avg / Max annotations (bottom strip) — readable size + contrast
+    ctx.font = '11px ' + MONO;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(214,224,240,0.72)';
+    ctx.fillText('min ' + formatVal(ch.min, s.unit), PAD_L, h - 7);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(236,243,255,0.92)';
+    ctx.fillText('avg ' + formatVal(ch.avg, s.unit), PAD_L + pw * 0.5, h - 7);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(214,224,240,0.72)';
+    ctx.fillText('max ' + formatVal(ch.max, s.unit), PAD_L + pw, h - 7);
 
     ch.offscreen = oc;
     ch.dpr = dpr;
