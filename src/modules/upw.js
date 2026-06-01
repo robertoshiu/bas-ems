@@ -53,11 +53,11 @@
       schP._body.style.padding = '8px 14px 12px';
       upwSch = U.Schematic(schP._body, {
         nodes: [
-          { id: 'raw',   label: 'Raw Water',    x: 10,  y: 30, channel: 'upwFlow' },
-          { id: 'ro',    label: 'RO Unit',       x: 90,  y: 30, channel: 'upwFlow' },
-          { id: 'edi',   label: 'EDI',           x: 170, y: 30, channel: 'upwFlow' },
-          { id: 'polish',label: 'Polish Loop',   x: 250, y: 30, channel: 'upwFlow' },
-          { id: 'pou',   label: 'Pt-of-Use',     x: 330, y: 30, channel: 'upwFlow' }
+          { id: 'raw',   label: 'Raw Water',    x: 12,  y: 30, channel: 'upwFlow' },
+          { id: 'ro',    label: 'RO Unit',       x: 124, y: 30, channel: 'upwFlow' },
+          { id: 'edi',   label: 'EDI',           x: 236, y: 30, channel: 'upwFlow' },
+          { id: 'polish',label: 'Polish Loop',   x: 348, y: 30, channel: 'upwFlow' },
+          { id: 'pou',   label: 'Pt-of-Use',     x: 460, y: 30, channel: 'upwFlow' }
         ],
         pipes: [
           { from: 'raw',    to: 'ro',     channel: 'upwFlow' },
@@ -65,7 +65,7 @@
           { from: 'edi',    to: 'polish', channel: 'upwFlow' },
           { from: 'polish', to: 'pou',    channel: 'upwFlow' }
         ],
-        width: 396, height: 70
+        width: 520, height: 70
       });
       grid.appendChild(schP);
 

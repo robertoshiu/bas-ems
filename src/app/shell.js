@@ -343,7 +343,7 @@ window.BAS = window.BAS || {};
     stream.dataset.filter = 'all';
     rail.appendChild(stream);
     body.appendChild(rail);
-    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3, // 3x slower than prior 2/s → ~1.5s/row
+    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 9, // 3x slower again → ~4.5s/row
       onAlarmClick: function (area) { navigateToAlarm(area); }
     });
 

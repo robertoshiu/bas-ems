@@ -21,8 +21,8 @@ window.BAS = window.BAS || {};
   'use strict';
   var U = BAS.ui;
 
-  // Node box half-dimensions
-  var NODE_W = 48, NODE_H = 22;
+  // Node box dimensions
+  var NODE_W = 54, NODE_H = 22;
   // Dash pattern for animated flow lines: gap length, total period
   var DASH_LEN = 8, DASH_GAP = 6, DASH_PERIOD = DASH_LEN + DASH_GAP;
   // Maximum dashoffset excursion (one full period)
@@ -78,16 +78,21 @@ window.BAS = window.BAS || {};
         pipeRefs.push(null);
         continue;
       }
-      nx1 = n1.x + NODE_W / 2;
-      ny1 = n1.y + NODE_H / 2;
-      nx2 = n2.x - NODE_W / 2;
-      ny2 = n2.y + NODE_H / 2;
-      // If nodes are vertically aligned, connect centre-to-centre
-      if (Math.abs(nx2 - nx1) < 4) {
-        nx1 = n1.x + NODE_W / 2;
-        nx2 = n2.x + NODE_W / 2;
-        ny1 = n1.y + NODE_H;
-        ny2 = n2.y;
+      // Connect boxes edge-to-edge in the dominant direction so the pipe spans the
+      // full visible gap (no overlap into the box, no inset before the target).
+      if (Math.abs(n2.x - n1.x) < 4) {
+        // vertical column: bottom edge of upper box -> top edge of lower box
+        nx1 = n1.x + NODE_W / 2; nx2 = n2.x + NODE_W / 2;
+        if (n2.y >= n1.y) { ny1 = n1.y + NODE_H; ny2 = n2.y; }
+        else              { ny1 = n1.y;          ny2 = n2.y + NODE_H; }
+      } else if (n2.x > n1.x) {
+        // left -> right: source right edge -> target left edge
+        nx1 = n1.x + NODE_W; ny1 = n1.y + NODE_H / 2;
+        nx2 = n2.x;          ny2 = n2.y + NODE_H / 2;
+      } else {
+        // right -> left: source left edge -> target right edge
+        nx1 = n1.x;          ny1 = n1.y + NODE_H / 2;
+        nx2 = n2.x + NODE_W; ny2 = n2.y + NODE_H / 2;
       }
       pathD = 'M ' + nx1 + ' ' + ny1 + ' L ' + nx2 + ' ' + ny2;
 
@@ -145,7 +150,7 @@ window.BAS = window.BAS || {};
         x: nd.x + NODE_W / 2,
         y: nd.y + NODE_H / 2 - 3,
         'text-anchor': 'middle',
-        'font-size': '7'
+        'font-size': '6.5'
       });
       labelEl.textContent = nd.label || nd.id;
       root.appendChild(labelEl);
