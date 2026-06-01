@@ -68,7 +68,7 @@ window.BAS = window.BAS || {};
     rail.appendChild(rh);
     var stream = el('div', 'stream'); stream.title = 'Hover to pause the stream and read'; rail.appendChild(stream);
     body.appendChild(rail);
-    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 });
+    ticker = U.Ticker(stream, { rateEl: rate, maxRows: 26, rowsPerSec: 2 / 3 }); // 3x slower than prior 2/s → ~1.5s/row
 
     app.appendChild(body);
 

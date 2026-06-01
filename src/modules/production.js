@@ -30,7 +30,7 @@
       logStream.title = 'Hover to pause the stream and read';
       logP._body.appendChild(logStream);
       grid.appendChild(logP);
-      logTicker = U.Ticker(logStream, { showAll: true, maxRows: 16, rowsPerSec: 3, rateEl: logP._head.querySelector('.meta') });
+      logTicker = U.Ticker(logStream, { showAll: true, maxRows: 16, rowsPerSec: 1, rateEl: logP._head.querySelector('.meta') }); // 3x slower than prior 3/s → ~1s/row
 
       // OEE gauges
       var oeeP = U.panel('Fab Equipment Effectiveness (E79 OEE)', { cls: 'col-4' });
