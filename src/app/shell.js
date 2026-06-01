@@ -59,6 +59,7 @@ window.BAS = window.BAS || {};
     body.appendChild(nav);
 
     var content = el('div', 'content'); refs.content = content;
+    content.setAttribute('role', 'tabpanel');
     body.appendChild(content);
 
     var rail = el('div', 'eventrail');
@@ -89,7 +90,31 @@ window.BAS = window.BAS || {};
       if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
       else if (e.key === ',') { e.preventDefault(); BAS.clockSource.step(-1); }
       else if (e.key === '.') { e.preventDefault(); BAS.clockSource.step(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        var orderedIds = navOrder();
+        var idx = orderedIds.indexOf(activeId);
+        if (idx < 0) idx = 0;
+        if (e.key === 'ArrowLeft') { if (idx > 0) idx -= 1; }
+        else { if (idx < orderedIds.length - 1) idx += 1; }
+        location.hash = '#' + orderedIds[idx];
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        location.hash = '#production';
+      } else {
+        var d = parseInt(e.key, 10);
+        if (d >= 1 && d <= 8) {
+          var ids = navOrder();
+          if (d - 1 < ids.length) { e.preventDefault(); location.hash = '#' + ids[d - 1]; }
+        }
+      }
     });
+  }
+
+  function navOrder() {
+    return BAS.modules.slice().sort(function (a, b) {
+      return (GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)) || ((a.order || 0) - (b.order || 0));
+    }).map(function (m) { return m.id; });
   }
 
   function buildNav(nav) {
@@ -102,6 +127,7 @@ window.BAS = window.BAS || {};
     mods.forEach(function (m) {
       if (m.group !== lastGroup) { nav.appendChild(el('div', 'nav-sec', m.group)); lastGroup = m.group; }
       var it = el('div', 'navitem');
+      it.setAttribute('role', 'tab');
       it.innerHTML = U.icon(m.icon) + '<span class="label">' + m.title + '</span>';
       var badge = el('span', 'badge-n'); badge.style.display = 'none'; it.appendChild(badge);
       it.addEventListener('click', function () { location.hash = '#' + m.id; });
@@ -124,7 +150,12 @@ window.BAS = window.BAS || {};
       refs.content.appendChild(c); mounted[id] = c;
     }
     activeId = id;
-    for (var nid in refs.navItems) refs.navItems[nid].item.classList.toggle('active', nid === id);
+    for (var nid in refs.navItems) {
+      var ni = refs.navItems[nid].item;
+      ni.classList.toggle('active', nid === id);
+      if (nid === id) { ni.setAttribute('aria-current', 'page'); }
+      else { ni.removeAttribute('aria-current'); }
+    }
     refs.content.scrollTop = 0;
   }
 
