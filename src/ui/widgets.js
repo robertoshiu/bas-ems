@@ -99,6 +99,10 @@ window.BAS = window.BAS || {};
     var node = el('div', 'gauge');
     node.style.width = size + 'px';
     var s = U.svg('svg', { viewBox: '0 0 100 100', width: size, height: size });
+    // role="meter" is required for aria-value* to be exposed to assistive tech;
+    // give it an accessible name from the gauge's own label/unit.
+    s.setAttribute('role', 'meter');
+    s.setAttribute('aria-label', (opts.label || 'gauge') + (opts.unit ? ' (' + opts.unit + ')' : ''));
     s.setAttribute('aria-valuemin', String(min));
     s.setAttribute('aria-valuemax', String(max));
     s.setAttribute('aria-valuenow', String(min));
@@ -123,7 +127,7 @@ window.BAS = window.BAS || {};
           var st = U.band(v, opts.thresholds.warn, opts.thresholds.bad, opts.thresholds.invert);
           valArc.setAttribute('stroke', U.cssVar('--' + (st === 'good' ? 'good' : st)));
         }
-        var rounded = Math.round(v);
+        var rounded = Math.round(Math.max(min, Math.min(max, v)));  // keep min <= valuenow <= max
         if (rounded !== lastNow) { lastNow = rounded; s.setAttribute('aria-valuenow', String(rounded)); }
       }
     };
