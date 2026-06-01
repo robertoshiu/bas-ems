@@ -62,5 +62,18 @@ ok('post-replay t near endT', Math.abs(t2 - 20) < 1e-6, t2.toFixed(3));
 // Restore real wall clock
 cs._setWall(function () { return (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : Date.now() / 1000; });
 
+load('src/ui/timeline-data.js');
+BAS.sim.init();
+const td1 = BAS.ui.timelineData.get();
+ok('demand length 360', td1.demand.length === 360, String(td1.demand.length));
+ok('peakMW plausible 20-50', td1.peakMW > 20 && td1.peakMW < 50, td1.peakMW.toFixed(1));
+ok('demand[0] finite', Number.isFinite(td1.demand[0]));
+// determinism: a fresh build equals the cached one element-for-element
+BAS.ui.timelineData._reset();
+const td2 = BAS.ui.timelineData.get();
+let identical = td1.demand.length === td2.demand.length;
+for (let i = 0; i < td1.demand.length && identical; i++) if (td1.demand[i] !== td2.demand[i]) identical = false;
+ok('demand precompute deterministic', identical);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);
