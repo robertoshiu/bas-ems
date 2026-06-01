@@ -140,8 +140,8 @@ svg, svg text { font-family: var(--mono); }
   color: var(--text);
   box-shadow: 0 4px 18px rgba(0,0,0,.55);
   min-width: 160px;
-  max-width: 240px;
-  white-space: nowrap;
+  width: max-content;
+  max-width: 260px;
 }
 .livefab-tooltip .lft-title {
   font-size: var(--fs-2);

@@ -39,8 +39,9 @@ window.BAS = window.BAS || {};
     areas.forEach(function (a) { areaTools[a.id] = M.toolsInArea(a.id).slice(0, 12); });
 
     // --- Tooltip (created once, reused) ---
-    var tooltip = null;
+    var tooltip = null;     // single reused element (production single-mounts; no destroy path needed)
     var lastFrame = null;
+    var lastHitId = null;   // gate: rebuild innerHTML only when the hovered target/values change
 
     function ensureTooltip() {
       if (tooltip) return;
@@ -52,19 +53,15 @@ window.BAS = window.BAS || {};
 
     function hideTooltip() {
       if (tooltip) tooltip.style.display = 'none';
+      lastHitId = null;
     }
 
-    function showTooltip(html, clientX, clientY) {
-      ensureTooltip();
-      tooltip.innerHTML = html;
-      tooltip.style.display = 'block';
-      // Position near cursor; nudge so tooltip doesn't sit under pointer
-      var tx = clientX + 14;
-      var ty = clientY - 10;
-      // Clamp to viewport
-      var tw = tooltip.offsetWidth || 200;
-      var th = tooltip.offsetHeight || 80;
-      if (tx + tw > window.innerWidth - 8) tx = clientX - tw - 10;
+    // Position near cursor (nudged off the pointer), clamped/flipped to the viewport.
+    // Cheap — runs every mousemove; the expensive innerHTML build is gated by lastHitId.
+    function positionTooltip(clientX, clientY) {
+      var tx = clientX + 14, ty = clientY - 10;
+      var tw = tooltip.offsetWidth || 200, th = tooltip.offsetHeight || 80;
+      if (tx + tw > window.innerWidth - 8)  tx = clientX - tw - 10;
       if (ty + th > window.innerHeight - 8) ty = clientY - th - 10;
       tooltip.style.left = tx + 'px';
       tooltip.style.top  = ty + 'px';
@@ -98,11 +95,18 @@ window.BAS = window.BAS || {};
         if (frame && frame.load && frame.load.areaKW && frame.load.areaKW[areaId] != null) {
           areaKW = frame.load.areaKW[areaId];
         }
-        var html = '<div class="lft-title">' + areaName + '</div>' +
-          '<div class="lft-row"><span class="lft-k">Area</span><span class="lft-v">' + areaId + '</span></div>' +
-          '<div class="lft-row"><span class="lft-k">Active / Total</span><span class="lft-v">' + active + ' / ' + total + '</span></div>' +
-          '<div class="lft-row"><span class="lft-k">Process Load</span><span class="lft-v">' + Math.round(areaKW).toLocaleString() + ' kW</span></div>';
-        showTooltip(html, ev.clientX, ev.clientY);
+        // Cheap signature; rebuild HTML (incl. toLocaleString) only when target/values change.
+        var hitId = 'b:' + areaId + ':' + active + ':' + total + ':' + Math.round(areaKW);
+        ensureTooltip();
+        if (hitId !== lastHitId) {
+          lastHitId = hitId;
+          tooltip.innerHTML = '<div class="lft-title">' + areaName + '</div>' +
+            '<div class="lft-row"><span class="lft-k">Area</span><span class="lft-v">' + areaId + '</span></div>' +
+            '<div class="lft-row"><span class="lft-k">Active / Total</span><span class="lft-v">' + active + ' / ' + total + '</span></div>' +
+            '<div class="lft-row"><span class="lft-k">Process Load</span><span class="lft-v">' + Math.round(areaKW).toLocaleString() + ' kW</span></div>';
+        }
+        tooltip.style.display = 'block';
+        positionTooltip(ev.clientX, ev.clientY);
         return;
       }
 
@@ -123,9 +127,15 @@ window.BAS = window.BAS || {};
           rawVal = frame.load[meta.key] * meta.scale;
         }
         var valStr = (rawVal >= 100 ? Math.round(rawVal) : rawVal.toFixed(1)) + ' ' + meta.unit;
-        var html2 = '<div class="lft-title">' + meta.label + '</div>' +
-          '<div class="lft-row"><span class="lft-k">Value</span><span class="lft-v">' + valStr + '</span></div>';
-        showTooltip(html2, ev.clientX, ev.clientY);
+        var hitId2 = 'n:' + hitNodeIdx + ':' + valStr;
+        ensureTooltip();
+        if (hitId2 !== lastHitId) {
+          lastHitId = hitId2;
+          tooltip.innerHTML = '<div class="lft-title">' + meta.label + '</div>' +
+            '<div class="lft-row"><span class="lft-k">Value</span><span class="lft-v">' + valStr + '</span></div>';
+        }
+        tooltip.style.display = 'block';
+        positionTooltip(ev.clientX, ev.clientY);
         return;
       }
 
