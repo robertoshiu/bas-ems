@@ -75,5 +75,15 @@ let identical = td1.demand.length === td2.demand.length;
 for (let i = 0; i < td1.demand.length && identical; i++) if (td1.demand[i] !== td2.demand[i]) identical = false;
 ok('demand precompute deterministic', identical);
 
+// ---- Task 5: alarms, density, e10 ----
+BAS.ui.timelineData._reset();
+const td = BAS.ui.timelineData.get();
+ok('alarms populated', td.alarms.length > 0, String(td.alarms.length));
+ok('alarm has setT<clearT', td.alarms.every(a => a.setT >= 0 && a.clearT <= 180 && a.setT < a.clearT));
+ok('density 120 bins', td.density.length === 120);
+ok('density nonzero somewhere', Array.from(td.density).some(v => v > 0));
+const firstTool = BAS.master.tools[0].id;
+ok('e10 ribbon for a tool', Array.isArray(td.e10[firstTool]) && td.e10[firstTool].length > 0);
+
 console.log('\n'+pass+' passed, '+fail+' failed');
 process.exit(fail?1:0);
