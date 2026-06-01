@@ -21,10 +21,10 @@ window.BAS = window.BAS || {};
     if (histCount < HIST_N) histCount++;
   }
 
-  // Returns array of history entries newest-first
+  // Returns array of history entries newest-first (out[0] = most recently pushed)
   function histSnapshot() {
     var out = [];
-    for (var i = histCount - 1; i >= 0; i--) {
+    for (var i = 0; i < histCount; i++) {
       out.push(histBuf[(histHead - 1 - i + HIST_N) % HIST_N]);
     }
     return out;
@@ -180,6 +180,7 @@ window.BAS = window.BAS || {};
 
   function closeDropdown() {
     dropdownOpen = false;
+    showingHistory = false;   // always reopen on the Active tab
     refs.banner.setAttribute('aria-expanded', 'false');
     refs.dropdown.style.display = 'none';
   }
@@ -191,6 +192,17 @@ window.BAS = window.BAS || {};
   // currentAlarms is the latest frame.alarms snapshot stored for rendering
   var latestAlarms = [];
   var showingHistory = false;
+  var lastRenderedSig = null;   // signature of the last dropdown render — re-render only on change
+
+  // Cheap signature of what the open dropdown shows, so update() can skip the full
+  // innerHTML rebuild when nothing changed (avoids a ~30Hz DOM teardown while open,
+  // which would also reset scroll position and churn listener closures).
+  function dropdownSig() {
+    if (showingHistory) return 'H:' + histHead + ':' + histCount;
+    var s = 'A:';
+    for (var i = 0; i < latestAlarms.length; i++) s += latestAlarms[i].alid + ',';
+    return s;
+  }
 
   function renderDropdown(histMode) {
     showingHistory = !!histMode;
@@ -251,16 +263,20 @@ window.BAS = window.BAS || {};
         list.appendChild(emptyH);
       } else {
         for (var j = 0; j < snap.length; j++) {
-          list.appendChild(buildHistRow(snap[j]));
+          list.appendChild(buildAlarmRow(snap[j], true));
         }
       }
     }
 
     dd.appendChild(list);
+    lastRenderedSig = dropdownSig();
   }
 
+  // Builds one alarm row for the active list (isHist=false, clickable -> navigate)
+  // or the history list (isHist=true, non-navigable). Data fields use textContent
+  // (not innerHTML) — el()'s 3rd arg is innerHTML, unsafe for data strings.
   function buildAlarmRow(alarm, isHist) {
-    var row = el('div', 'alarm-row');
+    var row = el('div', isHist ? 'alarm-row hist-row' : 'alarm-row');
     if (!isHist) {
       row.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -268,30 +284,16 @@ window.BAS = window.BAS || {};
         closeDropdown();
       });
     }
-    var sevBadge = el('span', 'alarm-sev-badge sev-' + (alarm.sev || 'INFO'), alarm.sev || 'INFO');
+    var sev = alarm.sev || 'INFO';
+    var sevBadge = el('span', 'alarm-sev-badge sev-' + sev); sevBadge.textContent = sev;
     row.appendChild(sevBadge);
-    var alid = el('span', 'alarm-alid', alarm.alid || '');
+    var alid = el('span', 'alarm-alid'); alid.textContent = (alarm.alid != null ? alarm.alid : '');
     row.appendChild(alid);
-    var txt = el('span', 'alarm-text', alarm.text || '');
+    var txt = el('span', 'alarm-text'); txt.textContent = alarm.text || '';
     row.appendChild(txt);
-    var tool = el('span', 'alarm-tool', alarm.tool || '');
+    var tool = el('span', 'alarm-tool'); tool.textContent = alarm.tool || '';
     row.appendChild(tool);
-    var area = el('span', 'alarm-area', alarm.area || '');
-    row.appendChild(area);
-    return row;
-  }
-
-  function buildHistRow(entry) {
-    var row = el('div', 'alarm-row hist-row');
-    var sevBadge = el('span', 'alarm-sev-badge sev-' + (entry.sev || 'INFO'), entry.sev || 'INFO');
-    row.appendChild(sevBadge);
-    var alid = el('span', 'alarm-alid', entry.alid || '');
-    row.appendChild(alid);
-    var txt = el('span', 'alarm-text', entry.text || '');
-    row.appendChild(txt);
-    var tool = el('span', 'alarm-tool', entry.tool || '');
-    row.appendChild(tool);
-    var area = el('span', 'alarm-area', entry.area || '');
+    var area = el('span', 'alarm-area'); area.textContent = alarm.area || '';
     row.appendChild(area);
     return row;
   }
@@ -391,8 +393,8 @@ window.BAS = window.BAS || {};
       if (dropdownOpen) closeDropdown();
     }
 
-    // keep dropdown content fresh if open
-    if (dropdownOpen) renderDropdown(showingHistory);
+    // keep dropdown content fresh if open — but only re-render when the shown set changed
+    if (dropdownOpen && dropdownSig() !== lastRenderedSig) renderDropdown(showingHistory);
 
     // nav badges (active alarms per module's area-set: only Production gets the count here)
     var pcount = al.length;
