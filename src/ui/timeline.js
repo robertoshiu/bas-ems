@@ -126,16 +126,40 @@ window.BAS = window.BAS || {};
       var headX = tToX(frame.t);
       ctx.strokeStyle = CS.isLive() ? COL_ACCENT : COL_WARN;
       ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(headX, 0); ctx.lineTo(headX, h); ctx.stroke();
+      // highlight band for active replay window
+      if (hi) {
+        var hx = tToX(hi.setT - 8 < 0 ? 0 : hi.setT - 8), hw = ((hi.clearT - hi.setT) + 13) / data.P * w;
+        ctx.fillStyle = U.hexA(U.cssVar('--accent-2'), .12); ctx.fillRect(hx, 0, hw, h);
+      }
       // hover crosshair
       if (hoverX >= 0) { ctx.strokeStyle = 'rgba(180,200,230,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hoverX, 0); ctx.lineTo(hoverX, h); ctx.stroke(); }
+    }
+
+    // ---- highlight band (set by replay.js via BAS.ui._timelineHighlight) ----
+    var hi = null;
+    BAS.ui._timelineHighlight = function (al) { hi = al; };
+
+    // ---- alarm hit-test: returns alarm whose span contains click (lane 1) ----
+    function alarmAt(pxX, pxY) {
+      var h = canvas._h, laneH = Math.floor((h - 4) / 4), y0 = 2 + 1 * laneH;
+      if (pxY < y0 || pxY > y0 + laneH) return null;
+      var t = xToT(pxX);
+      for (var i = 0; i < data.alarms.length; i++) { var a = data.alarms[i]; if (t >= a.setT && t <= a.clearT) return a; }
+      return null;
     }
 
     // ---- input ----
     var dragging = false;
     function getPx(e) { var r = canvas.getBoundingClientRect(); return e.clientX - r.left; }
+    function getPy(e) { var r = canvas.getBoundingClientRect(); return e.clientY - r.top; }
     function onMove(e) { if (dragging) CS.scrubTo(xToT(getPx(e))); }
     function onUp() { if (dragging) { dragging = false; CS.resume(); } }
-    canvas.addEventListener('mousedown', function (e) { dragging = true; CS.scrubTo(xToT(getPx(e))); });
+    canvas.addEventListener('mousedown', function (e) {
+      var r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      var a = alarmAt(mx, my);
+      if (a && BAS.replay) { BAS.replay.start(a); return; }
+      dragging = true; CS.scrubTo(xToT(mx));
+    });
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     canvas.addEventListener('mousemove', function (e) { hoverX = getPx(e); });
