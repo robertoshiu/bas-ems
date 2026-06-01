@@ -222,9 +222,20 @@ Max Concurrent: 6 (Wave 1 & 2)
 >   lane strip, which already shows loop position, richer. Do NOT build.
 > - **Task 3 (Keyboard Nav):** `shell.js` ALREADY has a keydown handler binding Space / `,` / `.` to
 >   the cockpit transport — coexist, do not clobber (see Task 3 Must-NOT-do).
-> - **Deferred (not this pass):** T5 favicon (optional), T11 filtering, T12 sparklines, T13
->   alarm-navigate (reconcile alarm-click vs cockpit replay first), T14 sustainability, T15–18 tail,
->   T19 Trends (must REUSE `BAS.ui.timelineData`, never re-sample `frame()`), T20 Demo (must showcase scrub/replay).
+> - **CORE: SHIPPED & DEPLOYED 2026-06-01** (merge ccaf503) — all 8 core tasks + their review fixes live.
+>
+> ### Deferred-Tail Build (2026-06-01, second pass)
+> Building the in-scope deferred tail per the gate decisions below:
+> - **TAIL BUILD SET (this pass):** **T5** favicon (trivial), **T11** event-stream filtering, **T14**
+>   sustainability targets, **T13** cross-module alarm-navigate (extends T10's banner nav to the ticker
+>   rows + nav-flash; reuse T10's `resolveModule`), **T19** Trends/historian (new module — precompute via
+>   `BAS.sim.load.sample(t')` NEVER `frame()`; cache static curve, redraw cursor; adds a 9th module so
+>   reconcile T3's digit `1-8` → `1-9`), **T20** Demo/guided mode (one timer+one listener, `demoNavigating`
+>   flag, captions tolerate empty `newEvents`, sorted-nav rotation incl. Trends, reduced-motion).
+> - **CUT (do NOT build, per /autoplan gate):** T12 header sparklines (1 s window = motion not insight;
+>   superseded by Trends), T15 registry micro-opt (zero expert payoff), T16 clipboard export
+>   (`navigator.clipboard` throws under `file://`; superseded by Trends). T17 info-strips & T18 responsive
+>   reframed to low-priority CSS-only — skipped this pass.
 
 - [ ] 1. Create SVG Schematic Utility Module (`src/ui/schematic.js`)
 
