@@ -26,6 +26,7 @@ window.BAS = window.BAS || {};
   };
 
   BAS.ui.LiveFab = function (canvas) {
+    canvas.setAttribute('aria-label', 'Living fab visualization showing production events driving facility load');
     var POOL = 460;
     var px = new Float32Array(POOL), py = new Float32Array(POOL), pp = new Float32Array(POOL),
       psp = new Float32Array(POOL), ptx = new Float32Array(POOL), pty = new Float32Array(POOL),
@@ -37,6 +38,113 @@ window.BAS = window.BAS || {};
     var areas = M.areas;
     var areaTools = {};
     areas.forEach(function (a) { areaTools[a.id] = M.toolsInArea(a.id).slice(0, 12); });
+
+    // --- Tooltip (created once, reused) ---
+    var tooltip = null;     // single reused element (production single-mounts; no destroy path needed)
+    var lastFrame = null;
+    var lastHitId = null;   // gate: rebuild innerHTML only when the hovered target/values change
+
+    function ensureTooltip() {
+      if (tooltip) return;
+      tooltip = document.createElement('div');
+      tooltip.className = 'livefab-tooltip';
+      tooltip.style.display = 'none';
+      document.body.appendChild(tooltip);
+    }
+
+    function hideTooltip() {
+      if (tooltip) tooltip.style.display = 'none';
+      lastHitId = null;
+    }
+
+    // Position near cursor (nudged off the pointer), clamped/flipped to the viewport.
+    // Cheap — runs every mousemove; the expensive innerHTML build is gated by lastHitId.
+    function positionTooltip(clientX, clientY) {
+      var tx = clientX + 14, ty = clientY - 10;
+      var tw = tooltip.offsetWidth || 200, th = tooltip.offsetHeight || 80;
+      if (tx + tw > window.innerWidth - 8)  tx = clientX - tw - 10;
+      if (ty + th > window.innerHeight - 8) ty = clientY - th - 10;
+      tooltip.style.left = tx + 'px';
+      tooltip.style.top  = ty + 'px';
+    }
+
+    function onMouseMove(ev) {
+      if (!layout) { hideTooltip(); return; }
+      // Map client coords -> layout coordinate space (CSS pixels that match layout.w/h)
+      var rect = canvas.getBoundingClientRect();
+      var mx = (ev.clientX - rect.left) * (layout.w / rect.width);
+      var my = (ev.clientY - rect.top)  * (layout.h / rect.height);
+      var frame = lastFrame;
+
+      // Hit-test bays first (larger targets)
+      var hitBay = null;
+      for (var bi = 0; bi < layout.bays.length; bi++) {
+        var b = layout.bays[bi];
+        if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+          hitBay = b; break;
+        }
+      }
+      if (hitBay) {
+        var areaId = hitBay.area.id;
+        var areaName = hitBay.area.name;
+        var active = 0, total = 0, areaKW = 0;
+        if (frame && frame.areaStates && frame.areaStates[areaId]) {
+          var st = frame.areaStates[areaId];
+          active = st.Productive != null ? st.Productive : 0;
+          total  = st.total != null ? st.total : 0;
+        }
+        if (frame && frame.load && frame.load.areaKW && frame.load.areaKW[areaId] != null) {
+          areaKW = frame.load.areaKW[areaId];
+        }
+        // Cheap signature; rebuild HTML (incl. toLocaleString) only when target/values change.
+        var hitId = 'b:' + areaId + ':' + active + ':' + total + ':' + Math.round(areaKW);
+        ensureTooltip();
+        if (hitId !== lastHitId) {
+          lastHitId = hitId;
+          tooltip.innerHTML = '<div class="lft-title">' + areaName + '</div>' +
+            '<div class="lft-row"><span class="lft-k">Area</span><span class="lft-v">' + areaId + '</span></div>' +
+            '<div class="lft-row"><span class="lft-k">Active / Total</span><span class="lft-v">' + active + ' / ' + total + '</span></div>' +
+            '<div class="lft-row"><span class="lft-k">Process Load</span><span class="lft-v">' + Math.round(areaKW).toLocaleString() + ' kW</span></div>';
+        }
+        tooltip.style.display = 'block';
+        positionTooltip(ev.clientX, ev.clientY);
+        return;
+      }
+
+      // Hit-test facility nodes (drawn at nd.x - nd.w/2, nd.y - 14, nd.w, 32)
+      var hitNode = null, hitNodeIdx = -1;
+      for (var ni = 0; ni < layout.nodes.length; ni++) {
+        var nd = layout.nodes[ni];
+        var nx1 = nd.x - nd.w / 2, nx2 = nd.x + nd.w / 2;
+        var ny1 = nd.y - 14,       ny2 = nd.y - 14 + 32;
+        if (mx >= nx1 && mx <= nx2 && my >= ny1 && my <= ny2) {
+          hitNode = nd; hitNodeIdx = ni; break;
+        }
+      }
+      if (hitNode) {
+        var meta = NODES[hitNodeIdx];
+        var rawVal = 0;
+        if (frame && frame.load && frame.load[meta.key] != null) {
+          rawVal = frame.load[meta.key] * meta.scale;
+        }
+        var valStr = (rawVal >= 100 ? Math.round(rawVal) : rawVal.toFixed(1)) + ' ' + meta.unit;
+        var hitId2 = 'n:' + hitNodeIdx + ':' + valStr;
+        ensureTooltip();
+        if (hitId2 !== lastHitId) {
+          lastHitId = hitId2;
+          tooltip.innerHTML = '<div class="lft-title">' + meta.label + '</div>' +
+            '<div class="lft-row"><span class="lft-k">Value</span><span class="lft-v">' + valStr + '</span></div>';
+        }
+        tooltip.style.display = 'block';
+        positionTooltip(ev.clientX, ev.clientY);
+        return;
+      }
+
+      hideTooltip();
+    }
+
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseleave', function () { hideTooltip(); });
 
     function computeLayout(w, h) {
       var nodeY = 46, nodeW = Math.min(150, (w - 40) / NODES.length - 14);
@@ -74,6 +182,7 @@ window.BAS = window.BAS || {};
     }
 
     function update(frame) {
+      lastFrame = frame;
       var w = canvas.clientWidth || (canvas.parentNode && canvas.parentNode.clientWidth) || 760;
       var h = canvas.clientHeight || 440;
       if (!layout || lw !== w || lh !== h) { layout = computeLayout(w, h); lw = w; lh = h; }

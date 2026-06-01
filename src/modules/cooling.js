@@ -10,6 +10,7 @@
   var kLoad, kPower, kEff, kTemps;             // top KPIs
   var chillerTbl, pcwTbl, ctTbl;               // tables
   var sLoad, sPower;                           // sparklines
+  var schematic;                               // P&ID schematic widget
   var fc = 0;
 
   var CHWS_SET = 6.5, CHWR_SET = 13.5;         // CHW supply/return setpoints (°C)
@@ -28,6 +29,72 @@
       root.appendChild(head);
 
       var grid = el('div', 'grid');
+
+      // ---- Chiller Plant P&ID Schematic (col-12, top of view) -----------
+      // Layout (viewBox 560x200):
+      //   Chillers (left column, 6 nodes in 2 cols) → CHW Header → Process Load
+      //   Cooling Towers (top right) → CW Header
+      //
+      // Real frame.load channels used:
+      //   chwKW  (~6490 kW)  — chiller plant kW → drives flow on CHW pipes
+      //   chwRT  (~10701 RT) — total cooling tons → drives flow on CT pipes
+      //   pcwRT  (~3170 RT)  — process cooling tons → CW header node live value
+      //
+      // Each node: one live value via 'channel' field (schematic API constraint).
+      // Detailed per-unit metrics (CHWS/CHWR temps, per-chiller kW) stay in tables.
+      var schP = U.panel('Chiller Plant P&ID — Schematic Overview', {
+        cls: 'col-12',
+        meta: 'CHW · CW · PCW',
+        metaId: 'schematic-meta'
+      });
+
+      // Node coordinates for a 560×200 viewBox:
+      //   CHLR-01..03  x=10,  y=18/68/118    CHLR-04..06  x=80, y=18/68/118
+      //   CHW-HDR      x=168, y=68           PROC (load)  x=270, y=68
+      //   CT-01..03    x=370, y=10/68/126    CW-HDR       x=465, y=68
+      // Node value labels all show cooling tons (chwRT/pcwRT) for a consistent unit;
+      // pipe flow speed is driven by chwKW (electrical load proxy). Return lines omitted for clarity.
+      schematic = U.Schematic(schP._body, {
+        width: 560,
+        height: 200,
+        nodes: [
+          // Chillers (left bank, two columns of 3)
+          { id: 'CHLR-01', label: 'CHLR-01', x: 10,  y: 18,  channel: 'chwRT' },
+          { id: 'CHLR-02', label: 'CHLR-02', x: 10,  y: 68,  channel: 'chwRT' },
+          { id: 'CHLR-03', label: 'CHLR-03', x: 10,  y: 118, channel: 'chwRT' },
+          { id: 'CHLR-04', label: 'CHLR-04', x: 80,  y: 18,  channel: 'chwRT' },
+          { id: 'CHLR-05', label: 'CHLR-05', x: 80,  y: 68,  channel: 'chwRT' },
+          { id: 'CHLR-06', label: 'CHLR-06', x: 80,  y: 118, channel: 'chwRT' },
+          // CHW Header (centre-left)
+          { id: 'CHW-HDR', label: 'CHW Hdr',  x: 168, y: 68,  channel: 'chwRT' },
+          // Process Load (centre)
+          { id: 'PROC',    label: 'Proc Load', x: 270, y: 68,  channel: 'pcwRT' },
+          // Cooling Towers (right column)
+          { id: 'CT-01',   label: 'CT-01',    x: 370, y: 10,  channel: 'chwRT' },
+          { id: 'CT-02',   label: 'CT-02',    x: 370, y: 68,  channel: 'chwRT' },
+          { id: 'CT-03',   label: 'CT-03',    x: 370, y: 126, channel: 'chwRT' },
+          // CW Header (bottom right, condenser water return)
+          { id: 'CW-HDR',  label: 'CW Hdr',   x: 465, y: 68,  channel: 'chwRT' }
+        ],
+        pipes: [
+          // Chiller bank 1 → CHW Header (chilled water supply — animated by chwKW)
+          { from: 'CHLR-01', to: 'CHW-HDR', channel: 'chwKW' },
+          { from: 'CHLR-02', to: 'CHW-HDR', channel: 'chwKW' },
+          { from: 'CHLR-03', to: 'CHW-HDR', channel: 'chwKW' },
+          // Chiller bank 2 → CHW Header
+          { from: 'CHLR-04', to: 'CHW-HDR', channel: 'chwKW' },
+          { from: 'CHLR-05', to: 'CHW-HDR', channel: 'chwKW' },
+          { from: 'CHLR-06', to: 'CHW-HDR', channel: 'chwKW' },
+          // CHW Header → Process Load (chilled water distribution)
+          { from: 'CHW-HDR', to: 'PROC',    channel: 'chwKW' },
+          // Cooling Towers → CW Header (condenser water return — animated by chwRT)
+          { from: 'CT-01',   to: 'CW-HDR',  channel: 'chwRT' },
+          { from: 'CT-02',   to: 'CW-HDR',  channel: 'chwRT' },
+          { from: 'CT-03',   to: 'CW-HDR',  channel: 'chwRT' }
+        ]
+      });
+
+      grid.appendChild(schP);
 
       // ---- top KPIs (each KPI lives in a col-3 panel) -------------------
       kLoad  = U.kpi({ label: 'Total Cooling Load', unit: 'RT', accent: true });
@@ -118,6 +185,9 @@
     update: function (frame) {
       fc++;
       var L = frame.load, tick = frame.tick;
+
+      // ---- P&ID schematic (throttled internally by tick % 4) ------------
+      schematic.update(frame);
 
       // ---- plant-level channels (track production) ----------------------
       var chwRT = L.chwRT;                                   // total CHW cooling tons

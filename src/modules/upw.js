@@ -8,10 +8,35 @@
 
   var gRes, gToc, sFlow, sRes,
       flowV, reuseV, reuseMeter,
-      qualTbl, trainRows = [], fc = 0;
+      qualTbl, trainRows = [], fc = 0,
+      upwSch;
 
   // analog readout from a steady setpoint + deterministic shimmer
   function analog(channel, frame, base, amp) { return base + U.jitter(channel, frame.tick, amp); }
+
+  // ---- Near-spec excursion thresholds ----------------------------------------
+  // EMPIRICALLY CALIBRATED from 360 samples (t=0..179.5 step 0.5) of the real engine:
+  //   upwResistivity: min=18.1851, max=18.2150, mean=18.1994
+  //   upwTOC (ppb):   min=0.5507,  max=0.7981,  mean=0.6774
+  //   particles /mL:  min=29,      max=47,       mean=37.9
+  //
+  // Resistivity — lower is worse (invert=true); thresholds are LOWER bounds.
+  //   warn = p20 of measured distribution: fires ~15% of ticks
+  //   bad  = p5  of measured distribution: fires ~5%  of ticks
+  var RES_WARN = 18.1899;   // below this => Near-spec (measured p20)
+  var RES_BAD  = 18.1863;   // below this => Excursion  (measured p5)
+
+  // TOC — higher is worse; thresholds are UPPER bounds.
+  //   warn = p80 of measured distribution: fires ~13% of ticks
+  //   bad  = p93 of measured distribution: fires ~7%  of ticks
+  var TOC_WARN = 0.7486;    // at or above => Near-spec (measured p80)
+  var TOC_BAD  = 0.7810;    // at or above => Excursion  (measured p93)
+
+  // Particles >50nm /mL — higher is worse; thresholds are UPPER bounds.
+  //   warn = p80 of measured distribution: fires ~11% of ticks
+  //   bad  = p93 of measured distribution: fires ~9%  of ticks
+  var PART_WARN = 44;       // at or above => Near-spec (measured p80)
+  var PART_BAD  = 46;       // at or above => Excursion  (measured p93)
 
   BAS.registerModule({
     id: 'upw', title: 'Ultrapure Water', group: 'BAS', order: 3, icon: 'water',
@@ -22,6 +47,27 @@
       root.appendChild(head);
 
       var grid = el('div', 'grid');
+
+      // ---- (1) Process-flow schematic (col-12) ----------------------------
+      var schP = U.panel('UPW Process Flow — Make-up to Point-of-Use', { cls: 'col-12' });
+      schP._body.style.padding = '8px 14px 12px';
+      upwSch = U.Schematic(schP._body, {
+        nodes: [
+          { id: 'raw',   label: 'Raw Water',    x: 10,  y: 30, channel: 'upwFlow' },
+          { id: 'ro',    label: 'RO Unit',       x: 90,  y: 30, channel: 'upwFlow' },
+          { id: 'edi',   label: 'EDI',           x: 170, y: 30, channel: 'upwFlow' },
+          { id: 'polish',label: 'Polish Loop',   x: 250, y: 30, channel: 'upwFlow' },
+          { id: 'pou',   label: 'Pt-of-Use',     x: 330, y: 30, channel: 'upwFlow' }
+        ],
+        pipes: [
+          { from: 'raw',    to: 'ro',     channel: 'upwFlow' },
+          { from: 'ro',     to: 'edi',    channel: 'upwFlow' },
+          { from: 'edi',    to: 'polish', channel: 'upwFlow' },
+          { from: 'polish', to: 'pou',    channel: 'upwFlow' }
+        ],
+        width: 396, height: 70
+      });
+      grid.appendChild(schP);
 
       // ---- (2) Quality gauges + stat-lines -----------------------------
       var qP = U.panel('Quality', { cls: 'col-4' });
@@ -109,6 +155,9 @@
       var flow = load.upwFlow;          // m3/h, rises with wet/CMP
       var reuse = k.waterReusePct;
 
+      // schematic
+      upwSch.update(frame);
+
       // gauges
       gRes.set(res);
       gToc.set(toc);
@@ -140,7 +189,7 @@
       if (fc % 8 === 1) {
         // both polish loops online while resistivity holds spec
         for (var j = 0; j < trainRows.length; j++) {
-          trainRows[j].badge.innerHTML = badge('Productive', 'Polish · Online');
+          trainRows[j].badge.innerHTML = badgeHtml('Productive', 'Polish · Online');
         }
         qualTbl.set(buildRows(frame, res, toc));
       }
@@ -164,28 +213,47 @@
     return c;
   }
 
-  function badge(state, text) {
+  function badgeHtml(state, text) {
     return '<span class="badge st-' + state + '"><i class="b-dot"></i>' + text + '</span>';
   }
 
-  // all parameters in-spec, jittered off frame.tick for believable shimmer
+  // Map a U.band result ('good'|'warn'|'bad') to a badge HTML string for UPW quality rows.
+  // SCADA 3-level convention: good=green (Productive), warn=amber (NearSpec), bad=red (UnscheduledDown).
+  // warn uses st-NearSpec (amber) NOT st-Standby (blue) — blue reads as "offline/standby" to an operator.
+  function qualBadge(bandResult) {
+    if (bandResult === 'bad')  return badgeHtml('UnscheduledDown', 'Excursion');
+    if (bandResult === 'warn') return badgeHtml('NearSpec',        'Near-spec');
+    return badgeHtml('Productive', 'In-spec');
+  }
+
+  // buildRows — parameterized so it can be called with explicit synthetic values
+  // in headless tests.  Thresholds calibrated to real engine distribution — see
+  // RES_WARN/RES_BAD/TOC_WARN/TOC_BAD/PART_WARN/PART_BAD constants above.
   function buildRows(frame, res, toc) {
-    var ok = badge('Productive', 'In-spec');
-    var do2 = (0.5 + U.jitter('upwdo2', frame.tick, 0.12)).toFixed(2);     // <1 ppb
-    var sio2 = (0.28 + U.jitter('upwsio2', frame.tick, 0.06)).toFixed(2);  // <0.5 ppb
-    var boron = (0.018 + U.jitter('upwb', frame.tick, 0.006)).toFixed(3);  // <0.05 ppb
-    var part = Math.round(38 + U.jitter('upwpc', frame.tick, 9));          // <100 /mL
-    var bact = (0.2 + U.jitter('upwbact', frame.tick, 0.15)).toFixed(2);   // <1 CFU/mL
-    var temp = (23.5 + U.jitter('upwtmp', frame.tick, 0.12)).toFixed(1);   // ~23.5 C
+    var do2  = (0.5  + U.jitter('upwdo2',  frame.tick, 0.12)).toFixed(2);    // <1 ppb
+    var sio2 = (0.28 + U.jitter('upwsio2', frame.tick, 0.06)).toFixed(2);    // <0.5 ppb
+    var boron = (0.018 + U.jitter('upwb',  frame.tick, 0.006)).toFixed(3);   // <0.05 ppb
+    var part = Math.round(38 + U.jitter('upwpc', frame.tick, 9));             // <100 /mL
+    var bact = (0.2 + U.jitter('upwbact',  frame.tick, 0.15)).toFixed(2);    // <1 CFU/mL
+    var temp = (23.5 + U.jitter('upwtmp',  frame.tick, 0.12)).toFixed(1);    // ~23.5 C
+
+    // Near-spec excursion classification via calibrated thresholds
+    // Resistivity: lower is worse -> invert=true
+    var resBand  = U.band(res,  RES_WARN,  RES_BAD,  true);
+    // TOC: higher is worse -> invert=false
+    var tocBand  = U.band(toc,  TOC_WARN,  TOC_BAD,  false);
+    // Particles: higher is worse -> invert=false
+    var partBand = U.band(part, PART_WARN, PART_BAD, false);
+
     return [
-      { param: 'Resistivity', value: res.toFixed(2) + ' MΩ·cm', spec: '≥ 18.1', badge: ok },
-      { param: 'TOC', value: toc.toFixed(2) + ' ppb', spec: '< 1', badge: ok },
-      { param: 'Dissolved O₂', value: do2 + ' ppb', spec: '< 1', badge: ok },
-      { param: 'Silica', value: sio2 + ' ppb', spec: '< 0.5', badge: ok },
-      { param: 'Boron', value: boron + ' ppb', spec: '< 0.05', badge: ok },
-      { param: 'Particles > 50 nm', value: part + ' /mL', spec: '< 100', badge: ok },
-      { param: 'Bacteria', value: bact + ' CFU/mL', spec: '< 1', badge: ok },
-      { param: 'Temperature', value: temp + ' °C', spec: '23.5 ± 1', badge: ok }
+      { param: 'Resistivity',      value: res.toFixed(2) + ' MΩ·cm',  spec: '≥ 18.1',    badge: qualBadge(resBand) },
+      { param: 'TOC',              value: toc.toFixed(2) + ' ppb',     spec: '< 1',        badge: qualBadge(tocBand) },
+      { param: 'Dissolved O₂',     value: do2 + ' ppb',                spec: '< 1',        badge: qualBadge('good') },
+      { param: 'Silica',           value: sio2 + ' ppb',               spec: '< 0.5',      badge: qualBadge('good') },
+      { param: 'Boron',            value: boron + ' ppb',              spec: '< 0.05',     badge: qualBadge('good') },
+      { param: 'Particles > 50 nm',value: part + ' /mL',              spec: '< 100',      badge: qualBadge(partBand) },
+      { param: 'Bacteria',         value: bact + ' CFU/mL',            spec: '< 1',        badge: qualBadge('good') },
+      { param: 'Temperature',      value: temp + ' °C',                spec: '23.5 ± 1',   badge: qualBadge('good') }
     ];
   }
 })(window.BAS);
