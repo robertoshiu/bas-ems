@@ -7,6 +7,10 @@ window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el;
+  var STATE_COL = {
+    'Productive': '#34d399', 'Standby': '#3a9dff', 'Engineering': '#9a7bff',
+    'Scheduled Down': '#f5b73d', 'Unscheduled Down': '#ff5d6c', 'Non-Scheduled': '#5c6981'
+  };
 
   BAS.ui.TimelineCockpit = function (container) {
     var CS = BAS.clockSource;
@@ -38,7 +42,7 @@ window.BAS = window.BAS || {};
 
     // ---- cached static layer (lanes drawn once) ----
     var staticC = document.createElement('canvas'), staticW = 0, staticH = 0, dpr = 1;
-    var COL_ACCENT = U.cssVar('--accent'), COL_WARN = U.cssVar('--warn');
+    var COL_ACCENT = U.cssVar('--accent'), COL_WARN = U.cssVar('--warn'), COL_BAD = U.cssVar('--bad');
     function xToT(px) { return Math.max(0, Math.min(data.P - 0.001, (px / canvas._w) * data.P)); }
     function tToX(t) { return (t / data.P) * canvas._w; }
 
@@ -53,14 +57,14 @@ window.BAS = window.BAS || {};
         if (i === 0) s.moveTo(x, y); else s.lineTo(x, y);
       }
       s.lineTo(x0 + w, y0 + hh); s.lineTo(x0, y0 + hh); s.closePath();
-      s.fillStyle = U.hexA(U.cssVar('--accent'), .14); s.fill();
+      s.fillStyle = U.hexA(COL_ACCENT, .14); s.fill();
       s.beginPath();
       for (var j = 0; j < N; j++) {
         var x2 = x0 + j / (N - 1) * w;
         var y2 = y0 + hh - ((data.demand[j] - data.minMW) / range) * hh;
         if (j === 0) s.moveTo(x2, y2); else s.lineTo(x2, y2);
       }
-      s.strokeStyle = U.cssVar('--accent'); s.lineWidth = 1; s.stroke(); s.restore();
+      s.strokeStyle = COL_ACCENT; s.lineWidth = 1; s.stroke(); s.restore();
     }
 
     function rebuildStatic() {
@@ -76,7 +80,7 @@ window.BAS = window.BAS || {};
       } else {
         // 4 stacked lanes
         var laneH = Math.floor((h - 4) / LANES.length), pad = 2;
-        function laneY(i) { return 2 + i * laneH; }
+        var laneY = function (i) { return 2 + i * laneH; };
 
         // lane 0: demand area chart
         drawDemand(s, 0, laneY(0), w, laneH - pad);
@@ -86,7 +90,7 @@ window.BAS = window.BAS || {};
           var a = data.alarms[ai];
           var ax = a.setT / data.P * w;
           var aw = Math.max(2, (a.clearT - a.setT) / data.P * w);
-          s.fillStyle = a.sev === 'MAJOR' ? U.cssVar('--bad') : U.cssVar('--warn');
+          s.fillStyle = a.sev === 'MAJOR' ? COL_BAD : COL_WARN;
           s.fillRect(ax, laneY(1) + 2, aw, laneH - pad - 4);
         }
 
@@ -95,20 +99,16 @@ window.BAS = window.BAS || {};
         for (var d0 = 0; d0 < data.density.length; d0++) { if (data.density[d0] > dmax) dmax = data.density[d0]; }
         var bw = w / data.density.length;
         for (var d = 0; d < data.density.length; d++) {
-          s.fillStyle = U.hexA(U.cssVar('--accent'), 0.12 + 0.6 * (data.density[d] / dmax));
+          s.fillStyle = U.hexA(COL_ACCENT, 0.12 + 0.6 * (data.density[d] / dmax));
           s.fillRect(d * bw, laneY(2) + 1, bw + 0.5, laneH - pad - 2);
         }
 
         // lane 3: E10 ribbon for selected tool
         var segs = data.e10[selTool] || [];
-        var stcol = {
-          'Productive': '#34d399', 'Standby': '#3a9dff', 'Engineering': '#9a7bff',
-          'Scheduled Down': '#f5b73d', 'Unscheduled Down': '#ff5d6c', 'Non-Scheduled': '#5c6981'
-        };
         for (var sg = 0; sg < segs.length; sg++) {
           var sx = segs[sg].startT / data.P * w;
           var sw = (segs[sg].endT - segs[sg].startT) / data.P * w;
-          s.fillStyle = stcol[segs[sg].state] || '#5c6981';
+          s.fillStyle = STATE_COL[segs[sg].state] || '#5c6981';
           s.fillRect(sx, laneY(3) + 1, sw, laneH - pad - 2);
         }
       }
