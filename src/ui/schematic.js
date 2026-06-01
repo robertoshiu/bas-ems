@@ -4,7 +4,9 @@
  *
  * Usage:
  *   var sch = BAS.ui.Schematic(container, {
- *     nodes: [{id:'A', label:'Chiller', x:50, y:50}, {id:'B', label:'Tower', x:200, y:50}],
+ *     nodes: [{id:'A', label:'Chiller', x:50, y:50, channel:'chwRT'}, {id:'B', label:'Tower', x:200, y:50}],
+ *       // node.channel: string → live value from frame.load[channel]; false → no value (identity box);
+ *       //               omitted/null → falls back to the node's first outgoing pipe channel
  *     pipes: [{from:'A', to:'B', channel:'chwRT'}],
  *     width:  320,   // optional SVG viewBox width (default 300)
  *     height: 180    // optional SVG viewBox height (default 160)
@@ -158,9 +160,12 @@ window.BAS = window.BAS || {};
       valEl.textContent = '';
       root.appendChild(valEl);
 
-      // lastVal initialised to NaN so first real value always triggers a write
+      // lastVal initialised to NaN so first real value always triggers a write.
+      // channel: a string selects frame.load[channel]; `false` suppresses the value
+      // entirely (identity-only box); null/undefined falls back to the first outgoing pipe.
       nodeRefs.push({ rect: rect, label: labelEl, val: valEl, id: nd.id,
-                      channel: nd.channel || null, lastVal: NaN });
+                      channel: (typeof nd.channel === 'string' ? nd.channel : null),
+                      noVal: nd.channel === false, lastVal: NaN });
     }
 
     container.appendChild(root);
@@ -195,11 +200,13 @@ window.BAS = window.BAS || {};
       }
 
       // Update node value labels.
-      // Channel priority: (1) explicit node.channel field, (2) first outgoing pipe channel.
+      // Channel priority: (1) node.channel === false → no value (identity box, skip);
+      // (2) explicit node.channel string; (3) first outgoing pipe channel.
       // Change-gate: only write textContent (and format the string) when the raw value
       // differs from the cached lastVal — eliminates per-frame string allocation in steady state.
       for (var ni = 0; ni < nodeCount; ni++) {
         nRef = nodeRefs[ni];
+        if (nRef.noVal) continue;   // identity-only node: leave the value label blank
         chVal = 0;
         if (nRef.channel) {
           // Fix 2: per-node explicit channel — supports terminal/sink nodes with no outgoing pipe

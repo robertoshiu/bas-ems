@@ -59,7 +59,7 @@
   // Returns 'Online' | 'Purge' | 'Standby'.
   function cabinetState(cabId, areaId, frame) {
     var as = frame.areaStates[areaId];
-    var prodFrac = as ? (as.Productive / as.total) : 0.5;
+    var prodFrac = (as && as.total > 0) ? (as.Productive / as.total) : 0.5;
     // Per-cabinet, per-tick deterministic value [0,1)
     var rv = P.rand('gh:cabst:' + cabId, frame.tick);
     // Online threshold scales from ~55% at 0% productive to ~95% at 100% productive
@@ -72,13 +72,15 @@
   }
 
   // Gas yard schematic layout: bulk tanks -> main N2 header -> scrubbers/oxidizers.
-  // Coordinates (viewBox 520 x 200).
+  // Coordinates (viewBox 520 x 230). Bulk tanks are identity boxes (no per-gas flow
+  // telemetry exists); live flow is aggregated on the header node (n2Flow).
   var GY_NODES = [
-    // Bulk tanks (left column)
-    { id: 'n2',    label: 'N2 Bulk',  x: 60,  y: 40,  channel: 'n2Flow' },
-    { id: 'o2',    label: 'O2 Bulk',  x: 60,  y: 90,  channel: null },
-    { id: 'ar',    label: 'Ar Bulk',  x: 60,  y: 140, channel: null },
-    { id: 'h2',    label: 'H2 Bulk',  x: 60,  y: 190, channel: null },
+    // Bulk tanks (left column) — identity boxes (channel:false → no value); no per-gas
+    // flow telemetry exists, so the aggregate distribution flow is shown on the header only.
+    { id: 'n2',    label: 'N2 Bulk',  x: 60,  y: 40,  channel: false },
+    { id: 'o2',    label: 'O2 Bulk',  x: 60,  y: 90,  channel: false },
+    { id: 'ar',    label: 'Ar Bulk',  x: 60,  y: 140, channel: false },
+    { id: 'h2',    label: 'H2 Bulk',  x: 60,  y: 190, channel: false },
     // Main distribution header (centre)
     { id: 'hdr',   label: 'Gas Hdr',  x: 220, y: 100, channel: 'n2Flow' },
     // Exhaust treatment (right column)

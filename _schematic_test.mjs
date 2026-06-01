@@ -154,6 +154,26 @@ sch2.update({ load: { tankLevel: 750, flowCh: 100 }, tick: 4 });
 ok('terminal node val label updated via node.channel', tankValEl.textContent !== '');
 ok('terminal node val shows correct formatted value', tankValEl.textContent === '750');
 
+// ---- noVal: channel:false suppresses the value label (identity box) -----------
+// 'IDB' has channel:false AND an outgoing pipe — value must stay blank (NO pipe fallback).
+// 'IDB2' has channel:null + the same pipe — must still show the outgoing-pipe value.
+var containerNV = domStub.createElement('div');
+var schNV = BAS.ui.Schematic(containerNV, {
+  nodes: [
+    { id: 'IDB',  label: 'Tank',  x: 10,  y: 10, channel: false },
+    { id: 'IDB2', label: 'Tank2', x: 10,  y: 60, channel: null },
+    { id: 'HDR',  label: 'Hdr',   x: 150, y: 35 }
+  ],
+  pipes: [
+    { from: 'IDB',  to: 'HDR', channel: 'fCh' },
+    { from: 'IDB2', to: 'HDR', channel: 'fCh' }
+  ]
+});
+var valElsNV = collectByClass(containerNV._children[0], 'val');
+schNV.update({ load: { fCh: 5000 }, tick: 4 });
+ok('channel:false node stays blank (identity box, no pipe fallback)', valElsNV[0].textContent === '');
+ok('channel:null node still shows outgoing-pipe fallback value', valElsNV[1].textContent === '5.0k');
+
 // ---- Fix 1: change-gate — textContent only written when value changes --------
 // We count writes by wrapping the val element's textContent setter with a counter.
 var container3 = domStub.createElement('div');
