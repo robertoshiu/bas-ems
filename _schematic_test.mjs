@@ -133,6 +133,61 @@ if (updateStart !== -1) {
   ok('no .push( inside update()',        body.indexOf('.push(') === -1);
 }
 
+// ---- Fix 2: per-node channel — terminal/sink node with explicit channel -------
+// Node 'C' has an explicit channel but NO outgoing pipe; its val label must update.
+var container2 = domStub.createElement('div');
+var sch2 = BAS.ui.Schematic(container2, {
+  nodes: [
+    { id: 'SRC', label: 'Source', x: 20, y: 20 },
+    { id: 'TANK', label: 'Tank', x: 150, y: 20, channel: 'tankLevel' }
+  ],
+  pipes: [
+    { from: 'SRC', to: 'TANK', channel: 'flowCh' }
+  ]
+});
+var svgRoot2 = container2._children[0];
+var valEls2 = collectByClass(svgRoot2, 'val');
+// TANK is index 1 in the nodes array, so valEls2[1] is its val element
+var tankValEl = valEls2[1];
+ok('tank val initially empty', tankValEl.textContent === '');
+sch2.update({ load: { tankLevel: 750, flowCh: 100 }, tick: 4 });
+ok('terminal node val label updated via node.channel', tankValEl.textContent !== '');
+ok('terminal node val shows correct formatted value', tankValEl.textContent === '750');
+
+// ---- Fix 1: change-gate — textContent only written when value changes --------
+// We count writes by wrapping the val element's textContent setter with a counter.
+var container3 = domStub.createElement('div');
+var sch3 = BAS.ui.Schematic(container3, {
+  nodes: [
+    { id: 'X', label: 'X', x: 10, y: 10, channel: 'xCh' },
+    { id: 'Y', label: 'Y', x: 150, y: 10 }
+  ],
+  pipes: [{ from: 'X', to: 'Y', channel: 'xCh' }]
+});
+var svgRoot3 = container3._children[0];
+var valEls3 = collectByClass(svgRoot3, 'val');
+var xValEl = valEls3[0];
+// Instrument: replace textContent with a counted property
+var writeCount = 0;
+var _lastWritten = xValEl.textContent;
+Object.defineProperty(xValEl, 'textContent', {
+  get: function () { return _lastWritten; },
+  set: function (v) { writeCount++; _lastWritten = v; }
+});
+// First call with value 1234 — should write once
+sch3.update({ load: { xCh: 1234 }, tick: 4 });
+var writesAfterFirst = writeCount;
+// Second and third calls with same value 1234 — should NOT write again
+sch3.update({ load: { xCh: 1234 }, tick: 8 });
+sch3.update({ load: { xCh: 1234 }, tick: 12 });
+var writesAfterRepeat = writeCount;
+ok('val written at least once on first distinct value', writesAfterFirst >= 1);
+ok('val NOT written again when value is unchanged (change-gate)', writesAfterRepeat === writesAfterFirst,
+   'writes after first=' + writesAfterFirst + ' writes after 2 repeats=' + writesAfterRepeat);
+// Now change the value — should write again
+sch3.update({ load: { xCh: 5678 }, tick: 16 });
+ok('val written again when value changes', writeCount > writesAfterRepeat);
+
 // ---- missing channel gracefully ignored (no throw) --------------------
 var threw = false;
 try {

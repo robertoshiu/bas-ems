@@ -125,7 +125,9 @@ window.BAS = window.BAS || {};
     }
 
     // ---- Build node boxes -----------------------------------------------
-    // nodeRefs[i] -> { rect, labelEl, valEl, id }
+    // nodeRefs[i] -> { rect, labelEl, valEl, id, channel, lastVal }
+    // channel: explicit per-node channel (optional); lastVal: cached last numeric value
+    // for the no-alloc gate — only write textContent when value changes.
     var nodeCount = nodes.length;
     var nodeRefs = [];
 
@@ -156,7 +158,9 @@ window.BAS = window.BAS || {};
       valEl.textContent = '';
       root.appendChild(valEl);
 
-      nodeRefs.push({ rect: rect, label: labelEl, val: valEl, id: nd.id });
+      // lastVal initialised to NaN so first real value always triggers a write
+      nodeRefs.push({ rect: rect, label: labelEl, val: valEl, id: nd.id,
+                      channel: nd.channel || null, lastVal: NaN });
     }
 
     container.appendChild(root);
@@ -166,6 +170,7 @@ window.BAS = window.BAS || {};
     var chVal = 0;       // channel value scratch
     var ref = null;      // pipe ref scratch
     var nRef = null;     // node ref scratch
+    var fmtVal = '';     // formatted string scratch (only written when value changes)
 
     // ---- update(frame) --------------------------------------------------
     function update(frame) {
@@ -183,21 +188,36 @@ window.BAS = window.BAS || {};
         ref.flow.setAttribute('stroke-dashoffset', ref.dashOffset.toFixed(2));
       }
 
-      // Update node value labels — show first pipe channel value for the node's outgoing pipe
+      // Update node value labels.
+      // Channel priority: (1) explicit node.channel field, (2) first outgoing pipe channel.
+      // Change-gate: only write textContent (and format the string) when the raw value
+      // differs from the cached lastVal — eliminates per-frame string allocation in steady state.
       for (var ni = 0; ni < nodeCount; ni++) {
         nRef = nodeRefs[ni];
-        // Find channel for this node (first pipe where from === id)
         chVal = 0;
-        for (var pj = 0; pj < pipeCount; pj++) {
-          if (pipeRefs[pj] && pipes[pj].from === nRef.id) {
-            chVal = (frame.load && frame.load[pipeRefs[pj].channel]) ? frame.load[pipeRefs[pj].channel] : 0;
-            break;
+        if (nRef.channel) {
+          // Fix 2: per-node explicit channel — supports terminal/sink nodes with no outgoing pipe
+          chVal = (frame.load && frame.load[nRef.channel]) ? frame.load[nRef.channel] : 0;
+        } else {
+          // Fallback: first pipe where this node is the source
+          for (var pj = 0; pj < pipeCount; pj++) {
+            if (pipeRefs[pj] && pipes[pj].from === nRef.id) {
+              chVal = (frame.load && frame.load[pipeRefs[pj].channel]) ? frame.load[pipeRefs[pj].channel] : 0;
+              break;
+            }
           }
         }
-        if (chVal !== 0) {
-          nRef.val.textContent = chVal >= 1000
-            ? (chVal / 1000).toFixed(1) + 'k'
-            : Math.round(chVal) + '';
+        // Fix 1: change-gate — only format+write when value differs from cached last
+        if (chVal !== nRef.lastVal) {
+          nRef.lastVal = chVal;
+          if (chVal !== 0) {
+            fmtVal = chVal >= 1000
+              ? (chVal / 1000).toFixed(1) + 'k'
+              : Math.round(chVal) + '';
+          } else {
+            fmtVal = '';
+          }
+          nRef.val.textContent = fmtVal;
         }
       }
     }
