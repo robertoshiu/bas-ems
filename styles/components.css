@@ -209,6 +209,11 @@ svg, svg text { font-family: var(--mono); }
 .livefab-tooltip .lft-k { color: var(--text-mut); }
 .livefab-tooltip .lft-v { color: var(--text); font-weight: 600; }
 
+/* trend / historian charts */
+canvas.trend-chart { display:block; width:100%; cursor:default; }
+.trend-chart-label { font-size: var(--fs-1); color: var(--text-mut); font-family: var(--mono);
+  letter-spacing:.04em; margin-bottom: 3px; }
+
 /* misc */
 .dim { color: var(--text-mut); } .mono { font-family: var(--mono); }
 .right { text-align: right; } .nowrap { white-space: nowrap; }

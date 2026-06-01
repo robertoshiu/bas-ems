@@ -233,8 +233,8 @@ window.BAS = window.BAS || {};
         location.hash = '#production';
       } else {
         var d = parseInt(e.key, 10);
-        // digits 1-8 only; cap matches current module count (extend if modules expand)
-        if (d >= 1 && d <= 8) {
+        // digits 1-9 only; cap matches current module count (extend if modules expand)
+        if (d >= 1 && d <= 9) {
           var ids = navOrder();
           if (d - 1 < ids.length) { e.preventDefault(); location.hash = '#' + ids[d - 1]; }
         }
