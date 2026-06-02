@@ -38,7 +38,7 @@ window.BAS = window.BAS || {};
     var fill = opts.fill !== false;
     var fixedMin = opts.min, fixedMax = opts.max;
     var height = opts.height || 44;
-    var slow = opts.slow || 3;   // record 1 of every `slow` pushes -> trend scrolls ~3x slower
+    var slow = opts.slow || 6;   // record 1 of every `slow` pushes -> calmer scroll (default 6; modules may override, e.g. cleanroom 15)
     var pushFc = 0;
     return {
       push: function (v) { pushFc++; if (pushFc % slow !== 0) return; buf[head] = v; head = (head + 1) % n; if (count < n) count++; },

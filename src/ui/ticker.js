@@ -39,10 +39,16 @@ window.BAS = window.BAS || {};
     return bits.join(' · ');
   }
 
-  // Only a true AlarmSet (rare, ~0.3/s) bypasses the rate limit — everything else
-  // (FDC, state changes, lots, AMHS) is paced so the stream stays readable. The
-  // evt/s counter still reports the true ~54/s, so the firehose reads as a number.
-  function isHigh(e) { return e.type === 'AlarmSet'; }
+  // Layered display rhythm. tier-1 alarms are loudest: they bypass hover-pause for
+  // situational awareness but are still capped to 1/sec so an alarm flood can't carpet
+  // the rail. tier-2 E10 state changes pace at 4s. tier-3 (everything else: lots, jobs,
+  // AMHS, FDC) uses the caller's own rowsPerSec, so each rail keeps its tuned cadence.
+  // The evt/s counter still reports the true ~54/s, so the firehose still reads as a number.
+  function tierOf(e) {
+    if (e.type === 'AlarmSet') return 1;
+    if (e.type === 'ControlStateChange') return 2;
+    return 3;
+  }
 
   BAS.ui.Ticker = function (streamEl, opts) {
     opts = opts || {};
@@ -53,8 +59,12 @@ window.BAS = window.BAS || {};
     // Decouple DISPLAY cadence from the true event rate: routine events are
     // released at most rowsPerSec; alarms/FDC always show; the counter keeps
     // reporting the real (high) throughput so it still reads as "nonstop".
-    var minGapMs = 1000 / (opts.rowsPerSec || 3);
-    var emaRate = 0, lastMs = null, lastRoutineMs = -1e9, paused = false, lastRateMs = -1e9;
+    var minGapMs = 1000 / (opts.rowsPerSec || 3);   // tier-3 (routine) per-caller cadence
+    var TIER1_GAP = 1000;   // tier-1 (AlarmSet): at most 1 row/sec, even while hover-paused
+    var TIER2_GAP = 4000;   // tier-2 (ControlStateChange / E10): at most 1 row/4s
+    var emaRate = 0, lastMs = null, paused = false, lastRateMs = -1e9;
+    // Last-shown timestamp per tier — created once in closure scope (zero per-frame alloc).
+    var lastTierMs = { 1: -1e9, 2: -1e9, 3: -1e9 };
 
     // Pause-on-hover so a reader can stop the stream and actually read a row.
     streamEl.addEventListener('mouseenter', function () { paused = true; });
@@ -87,26 +97,38 @@ window.BAS = window.BAS || {};
           if (dt > 0) { var inst = events.length / dt; emaRate = emaRate ? emaRate * 0.9 + inst * 0.1 : inst; }
         }
         lastMs = nowMs;
-        if (paused) { if (rateEl) rateEl.textContent = '❚❚ paused'; return; }
-        // Throttle the evt/s readout to ~1s so the number is calm/readable (the EMA
-        // still tracks every frame; only the display cadence is slowed).
-        if (rateEl && nowMs - lastRateMs > 1000) {
+        // Rate readout: show the paused indicator while hover-paused, otherwise throttle the
+        // evt/s number to ~1s (the EMA still tracks every frame; only display cadence slows).
+        if (paused) {
+          if (rateEl) rateEl.textContent = '❚❚ paused';
+        } else if (rateEl && nowMs - lastRateMs > 1000) {
           lastRateMs = nowMs;
           rateEl.textContent = (emaRate ? emaRate.toFixed(0) : '0') + ' evt/s';
         }
 
         var hms = sim ? sim.hms : '00:00:00';
-        var admittedRoutine = false; // at most one routine row per frame
+        // At most one row per tier per frame; per-tier min-gap enforces the layered rhythm.
+        var admitted1 = false, admitted2 = false, admitted3 = false;
         for (var i = 0; i < events.length; i++) {
           var e = events[i];
           if (!showAll && !RAIL_TYPES[e.type]) continue;
           if (filterCls && !filterCls(e)) continue;
-          if (isHigh(e)) {
+          var tier = tierOf(e);
+          // Hover-pause: tier-1 alarms still post (situational awareness); tier-2/3 are
+          // dropped and the stream simply resumes live on mouseleave (no stale backlog).
+          if (paused && tier !== 1) continue;
+          if (tier === 1) {
+            if (admitted1 || (nowMs - lastTierMs[1]) < TIER1_GAP) continue;
             streamEl.insertBefore(rowEl(e, hms), streamEl.firstChild);
+            lastTierMs[1] = nowMs; admitted1 = true;
+          } else if (tier === 2) {
+            if (admitted2 || (nowMs - lastTierMs[2]) < TIER2_GAP) continue;
+            streamEl.insertBefore(rowEl(e, hms), streamEl.firstChild);
+            lastTierMs[2] = nowMs; admitted2 = true;
           } else {
-            if (admittedRoutine || (nowMs - lastRoutineMs) < minGapMs) continue;
+            if (admitted3 || (nowMs - lastTierMs[3]) < minGapMs) continue;
             streamEl.insertBefore(rowEl(e, hms), streamEl.firstChild);
-            lastRoutineMs = nowMs; admittedRoutine = true;
+            lastTierMs[3] = nowMs; admitted3 = true;
           }
         }
         while (streamEl.childNodes.length > maxRows) streamEl.removeChild(streamEl.lastChild);

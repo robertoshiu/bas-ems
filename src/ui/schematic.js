@@ -151,7 +151,8 @@ window.BAS = window.BAS || {};
         x: nd.x + NODE_W / 2,
         y: nd.y + NODE_H / 2 - 3,
         'text-anchor': 'middle',
-        'font-size': (6.5 * fontScale).toFixed(2)
+        'font-size': (6.5 * fontScale).toFixed(2),
+        'class': 'label'
       });
       labelEl.textContent = nd.label || nd.id;
       root.appendChild(labelEl);
