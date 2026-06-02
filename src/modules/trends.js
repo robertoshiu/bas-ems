@@ -144,7 +144,6 @@
     ctx.scale(dpr, dpr);
 
     var PAD_T = 18, PAD_B = 34, PAD_L = 6, PAD_R = 6;
-    var MONO = U.cssVar('--mono') || 'monospace';
     var pw = w - PAD_L - PAD_R;
     var ph = h - PAD_T - PAD_B;
 
@@ -181,10 +180,7 @@
       ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(PAD_L, pyv); ctx.lineTo(PAD_L + pw, pyv); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,120,135,0.82)';
-      ctx.font = '9px ' + MONO;
-      ctx.textAlign = 'right';
-      ctx.fillText('peak ' + s.peakMW.toFixed(1), PAD_L + pw - 2, pyv - 3);
+      // 'peak NN' label is a crisp DOM overlay now (see buildOverlays), not Canvas text.
     }
 
     // Avg line (dashed, muted)
@@ -224,28 +220,8 @@
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // X-axis tick labels: 0, 15, 30, 45, 60 min (above the min/avg/max strip)
-    ctx.fillStyle = 'rgba(190,202,222,0.5)';
-    ctx.font = '9px ' + MONO;
-    var xLabels = [0, 15, 30, 45, 60];
-    for (var xi = 0; xi < xLabels.length; xi++) {
-      var xprog = xLabels[xi] / 60;
-      var xpos = PAD_L + xprog * pw;
-      ctx.textAlign = xi === 0 ? 'left' : xi === xLabels.length - 1 ? 'right' : 'center';
-      ctx.fillText(xLabels[xi] + 'm', xpos, PAD_T + ph + 13);
-    }
-
-    // Min / Avg / Max annotations (bottom strip) — readable but thin (not heavy/blurry)
-    ctx.font = '10px ' + MONO;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(205,216,234,0.62)';
-    ctx.fillText('min ' + formatVal(ch.min, s.unit), PAD_L, h - 7);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(226,235,250,0.8)';
-    ctx.fillText('avg ' + formatVal(ch.avg, s.unit), PAD_L + pw * 0.5, h - 7);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(205,216,234,0.62)';
-    ctx.fillText('max ' + formatVal(ch.max, s.unit), PAD_L + pw, h - 7);
+    // X-axis ticks (0/15/30/45/60m) and the min/avg/max strip are crisp DOM overlays now
+    // (see buildOverlays); no Canvas text is drawn for them — this fixes the sub-pixel blur.
 
     ch.offscreen = oc;
     ch.dpr = dpr;
@@ -288,12 +264,18 @@
           var s = ch.series;
           var meta = buildMeta(ch);
           var p = U.panel(s.title + ' — ' + s.unit, { cls: colCls, meta: meta });
+          // Relative wrapper anchors the crisp DOM label overlays to the chart (not the page).
+          var wrap = el('div', 'trend-chart-wrap');
           var canvas = el('canvas', 'trend-chart');
           canvas.style.height = '140px';
           canvas.style.display = 'block';
           canvas.style.width = '100%';
-          p._body.appendChild(canvas);
+          wrap.appendChild(canvas);
           ch.canvas = canvas;
+          // min/avg/max/peak are precomputed (static) and the x-axis ticks are constant,
+          // so write them once here as DOM <div>s. No per-frame overlay work.
+          buildOverlays(ch, wrap);
+          p._body.appendChild(wrap);
           // Draw static layer as soon as the element exists with a known size
           // (use a short setTimeout so the DOM is laid out and offsetWidth is real)
           setTimeout(function () { rebuildStatic(ch); }, 0);
@@ -366,6 +348,29 @@
     }
     if (s.peakLine && s.peakMW !== undefined) return 'peak ' + s.peakMW.toFixed(1) + ' MW';
     return '60 sim-min';
+  }
+
+  // ---- Build crisp DOM label overlays for one chart ----------------------
+  // min/avg/max + peak are precomputed and constant across the loop, and the x-axis
+  // ticks are fixed, so everything is written exactly once. Replaces the old sub-pixel
+  // Canvas text (the "numbers too thick / blurry" complaint). Positioned via CSS against
+  // the .trend-chart-wrap; pointer-events:none so the canvas stays interactive.
+  function buildOverlays(ch, wrap) {
+    var s = ch.series;
+    var hasData = built && ch.vals;
+    function ov(extraCls, attr, val, text) {
+      var d = el('div', 'trend-overlay' + (extraCls ? ' ' + extraCls : ''));
+      d.setAttribute(attr, val);
+      d.textContent = text;
+      wrap.appendChild(d);
+    }
+    ov('', 'data-stat', 'min', hasData ? 'min ' + formatVal(ch.min, s.unit) : 'min —');
+    ov('', 'data-stat', 'avg', hasData ? 'avg ' + formatVal(ch.avg, s.unit) : 'avg —');
+    ov('', 'data-stat', 'max', hasData ? 'max ' + formatVal(ch.max, s.unit) : 'max —');
+    var xs = [0, 15, 30, 45, 60];
+    for (var i = 0; i < xs.length; i++) ov('x-axis', 'data-x', '' + xs[i], xs[i] + 'm');
+    // Peak readout (demand chart only) — DOM now, so it matches the other labels.
+    if (s.peakLine && s.peakMW !== undefined) ov('', 'data-stat', 'peak', 'peak ' + s.peakMW.toFixed(1));
   }
 
   // ---- Rebuild the offscreen static layer for one chart -----------------
