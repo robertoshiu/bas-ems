@@ -84,6 +84,7 @@ window.BAS = window.BAS || {};
 
   // Build a narration caption from the current frame
   var DEMO_MODULE_LABELS = {
+    overview:     'Command Center — facility demand, isometric fab cutaway & energy flow',
     production:   'Production Floor — tool states, lot tracking & AMHS moves',
     trends:       'Trends & Historian — 180-min KPI sparklines for all subsystems',
     cleanroom:    'Cleanroom HVAC — ISO 14644 zone pressure & FFU airflow',
@@ -584,6 +585,11 @@ window.BAS = window.BAS || {};
     }
     refs.content.setAttribute('aria-labelledby', 'tab-' + id);
     refs.content.scrollTop = 0;
+
+    // Re-trigger the module-switch stagger: re-add .view-enter on the active container.
+    // Force a reflow so removing+re-adding restarts the CSS animation every route change.
+    var mc = mounted[id];
+    if (mc) { mc.classList.remove('view-enter'); void mc.offsetWidth; mc.classList.add('view-enter'); }
   }
 
   function update(frame) {
@@ -625,8 +631,15 @@ window.BAS = window.BAS || {};
       var worst = al[al.length - 1];
       refs.bannerMsg.textContent = 'ALID ' + worst.alid + ' — ' + worst.text + ' @ ' + worst.tool;
       refs.bannerCnt.textContent = al.length + ' active alarm' + (al.length > 1 ? 's' : '');
+      // urgency glow when any active alarm is critical/major
+      var anyCrit = false;
+      for (var ci = 0; ci < al.length; ci++) {
+        if (al[ci].sev === 'CRIT' || al[ci].sev === 'MAJOR') { anyCrit = true; break; }
+      }
+      refs.banner.classList.toggle('crit', anyCrit);
     } else {
       refs.banner.classList.add('hidden');
+      refs.banner.classList.remove('crit');
       if (dropdownOpen) closeDropdown();
     }
 

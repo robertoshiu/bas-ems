@@ -110,7 +110,8 @@ window.BAS = window.BAS || {};
     leaf: '<path d="M13 3C7 3 4 6 4 11c0 0 1-4 9-5 0 0-6 2-7 7 5 0 9-3 9-10z" />',
     flow: '<path d="M2 8h9m-3-3l3 3-3 3M13 4v8" />',
     db: '<path d="M8 2c3 0 5 1 5 2v8c0 1-2 2-5 2s-5-1-5-2V4c0-1 2-2 5-2zM3 7c0 1 2 2 5 2s5-1 5-2" />',
-    grid: '<path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z" />'
+    grid: '<path d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z" />',
+    hub: '<circle cx="8" cy="8" r="6.2" /><circle cx="8" cy="8" r="2" /><path d="M8 8l4.4-4.4M8 8l-4.4 4.4" /><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2" />'
   };
   function icon(name) {
     return '<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.grid) + '</svg>';

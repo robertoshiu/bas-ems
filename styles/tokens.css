@@ -1,8 +1,9 @@
 /* bas-ems — design tokens (dark industrial SCADA, generic-vendor)
-   No web fonts (system stack) so it renders identically from file://. */
+   System font stack renders identically from file://. The optional "Chakra Petch"
+   display face (loaded in index.html) degrades gracefully to the system stack offline. */
 :root {
   /* surfaces */
-  --bg:        #080b11;
+  --bg:        #05070d;
   --bg-1:      #0c111a;
   --bg-2:      #111826;
   --bg-3:      #18212f;
@@ -41,6 +42,8 @@
   /* fonts */
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* display face for module titles + large numeric reads; degrades to the sans stack offline */
+  --display: "Chakra Petch", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 
   /* type scale */
   --fs-0: 10px; --fs-1: 11px; --fs-2: 12px; --fs-3: 13px; --fs-4: 15px;
@@ -52,6 +55,8 @@
 
   /* effects */
   --shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 0 1px var(--line);
+  --shadow-raise: 0 6px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04);
   --glow: 0 0 12px;
+  --glow-accent: 0 0 18px rgba(37,224,207,.35);
   --grid-line: rgba(120,150,190,.06);
 }
