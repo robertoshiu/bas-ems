@@ -2,6 +2,12 @@
  * Classic script -> registers module 'trends'
  * Group: Operations, order: 2 (right after Production order:1).
  *
+ * "Historian wall": a col-12 .panel.hud header band with a per-channel .chip-row
+ * (now / min / avg / max chips for all 5 channels, change-gated), then 5 trend
+ * charts. Each chart has an accent gradient fill (via U.hexA), a hover crosshair
+ * with a value+time readout (single shared tooltip DOM, redraw reuses the cached
+ * static layer the module already blits each frame), and unified axis styling.
+ *
  * Plots 5 whole-shift-hour curves over the 180s loop (x = simulated minutes 0-60):
  *   1. Total Demand (MW)
  *   2. Facility Overhead Ratio
@@ -13,7 +19,7 @@
  *   - Precompute ONCE in mount() via load.sample(t') only (pure, never frame()).
  *   - Each chart: static layer (curve + bands + min/avg/max) drawn ONCE into an
  *     offscreen canvas; update(frame) blits the offscreen canvas then draws only
- *     the 1px now-cursor. Zero per-frame allocation.
+ *     the 1px now-cursor (+ optional hover crosshair). Zero per-frame allocation.
  */
 (function (BAS) {
   'use strict';
@@ -72,6 +78,17 @@
   // Closure-scope widget state
   var built = false;
   var charts = [];   // [{canvas, offscreen, vals, min, avg, max, yLo, yHi, series}]
+
+  // Header-band chip refs (built once, mutated change-gated in update)
+  var chipRefs = [];        // [{ id, now, min, avg, max, lastNow }]
+  var headerBuilt = false;
+
+  // Shared hover tooltip DOM (single node reused across all 5 charts)
+  var tip = null, tipBuilt = false;
+  var tipChan = null, tipTime = null, tipVal = null;
+  var hoverCh = null;       // chart currently hovered (or null)
+  var hoverIdx = -1;        // sample index under the cursor (-1 = none)
+  var lastTipKey = '';      // change-gate for tooltip text
 
   // ---- Precompute --------------------------------------------------------
   // Called once from mount() after BAS.sim.init(). Uses load.sample only.
@@ -156,6 +173,19 @@
     // Background
     ctx.clearRect(0, 0, w, h);
 
+    // Unified axis styling: faint horizontal gridlines (quartiles) + a baseline.
+    // Drawn into the STATIC layer (zero per-frame cost). Subtle so the curve leads.
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash(EMPTY_DASH);
+    for (var gq = 1; gq <= 3; gq++) {
+      var gy = PAD_T + (gq / 4) * ph;
+      ctx.beginPath(); ctx.moveTo(PAD_L, gy); ctx.lineTo(PAD_L + pw, gy); ctx.stroke();
+    }
+    // x-axis baseline (slightly stronger)
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.beginPath(); ctx.moveTo(PAD_L, PAD_T + ph); ctx.lineTo(PAD_L + pw, PAD_T + ph); ctx.stroke();
+
     // Spec/setpoint band (shaded region)
     var s = ch.series;
     if (s.bandLo !== null && s.bandHi !== null) {
@@ -191,7 +221,7 @@
     ctx.beginPath(); ctx.moveTo(PAD_L, avgY); ctx.lineTo(PAD_L + pw, avgY); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Curve fill (gradient under the line)
+    // Curve fill (accent gradient under the line) — colour via U.hexA per series.
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(xOf(0), yOf(ch.vals[0]));
@@ -200,13 +230,9 @@
     ctx.lineTo(PAD_L, PAD_T + ph);
     ctx.closePath();
     var grad = ctx.createLinearGradient(0, PAD_T, 0, PAD_T + ph);
-    // Parse hex color to rgba
-    var hex = s.color.replace('#', '');
-    var rr = parseInt(hex.substring(0, 2), 16);
-    var gg = parseInt(hex.substring(2, 4), 16);
-    var bb = parseInt(hex.substring(4, 6), 16);
-    grad.addColorStop(0, 'rgba(' + rr + ',' + gg + ',' + bb + ',0.22)');
-    grad.addColorStop(1, 'rgba(' + rr + ',' + gg + ',' + bb + ',0.02)');
+    grad.addColorStop(0, U.hexA(s.color, 0.24));
+    grad.addColorStop(0.55, U.hexA(s.color, 0.08));
+    grad.addColorStop(1, U.hexA(s.color, 0.02));
     ctx.fillStyle = grad;
     ctx.fill();
     ctx.restore();
@@ -227,6 +253,7 @@
     ch.dpr = dpr;
     ch.drawW = w; ch.drawH = h;
     ch.PAD_L = PAD_L; ch.PAD_R = PAD_R; ch.PAD_T = PAD_T; ch.PAD_B = PAD_B;
+    ch.plotW = pw; ch.plotH = ph;
   }
 
   // ---- Format a value for annotation ------------------------------------
@@ -234,6 +261,15 @@
     if (unit === 'MW' || unit === 'x' || unit === 'MΩ·cm') return v.toFixed(2);
     if (unit === 'CFM' || unit === 'RT') return Math.round(v).toString();
     return v.toFixed(2);
+  }
+
+  // Convert a sample index to an "MM:SS into the hour" time label (0..60 sim-min).
+  function timeLabelOf(idx) {
+    var frac = idx / (N_SAMPLES - 1);         // 0..1 across the loop
+    var simMin = frac * 60;                   // 0..60 simulated minutes
+    var mm = Math.floor(simMin);
+    var ss = Math.floor((simMin - mm) * 60);
+    return (mm < 10 ? '0' + mm : mm) + ':' + (ss < 10 ? '0' + ss : ss);
   }
 
   // ---- Module registration -----------------------------------------------
@@ -256,6 +292,12 @@
 
       var grid = el('div', 'grid');
 
+      // ---- Header band: per-channel chip-row (now/min/avg/max) -----------
+      buildHeaderBand(grid);
+
+      // Build the shared hover tooltip once (appended to <body>, positioned fixed).
+      buildTooltip();
+
       // Create 5 chart panels in a 2+3 layout
       var widths = ['col-6', 'col-6', 'col-4', 'col-4', 'col-4'];
 
@@ -275,6 +317,9 @@
           // min/avg/max/peak are precomputed (static) and the x-axis ticks are constant,
           // so write them once here as DOM <div>s. No per-frame overlay work.
           buildOverlays(ch, wrap);
+          // Hover crosshair wiring: stash the hovered sample index on the chart;
+          // the per-frame update() reuses the cached static layer to redraw it.
+          attachHover(ch, canvas);
           p._body.appendChild(wrap);
           // Draw static layer as soon as the element exists with a known size
           // (use a short setTimeout so the DOM is laid out and offsetWidth is real)
@@ -291,6 +336,10 @@
       var CK = BAS.clock;
       var t = frame.t;
       var xProg = t / CK.PERIOD;   // 0..1
+
+      // Header chips: "now" sample tracks the now-cursor (same data the curve shows).
+      // Throttled + change-gated so it stays calm and allocation-free.
+      if (frame.tick % 4 === 0) updateHeaderBand(xProg);
 
       for (var ci = 0; ci < charts.length; ci++) {
         var ch = charts[ci];
@@ -316,15 +365,40 @@
         // Blit the cached static layer
         ctx.drawImage(ch.offscreen, 0, 0, w, h);
 
-        // Draw the now-cursor (1px wide, no allocation)
         var pw = w - ch.PAD_L - ch.PAD_R;
+        var plotH = h - ch.PAD_T - ch.PAD_B;
+
+        // Hover crosshair (reuses the just-blitted static layer; no new allocation).
+        if (hoverCh === ch && hoverIdx >= 0 && hoverIdx < N_SAMPLES) {
+          var hx = ch.PAD_L + (hoverIdx / (N_SAMPLES - 1)) * pw;
+          var yRange = (ch.yHi - ch.yLo) || 1;
+          var hy = ch.PAD_T + (1 - (ch.vals[hoverIdx] - ch.yLo) / yRange) * plotH;
+          ctx.strokeStyle = U.hexA(ch.series.color, 0.55);
+          ctx.lineWidth = 1;
+          ctx.setLineDash(EMPTY_DASH);
+          ctx.beginPath();
+          ctx.moveTo(hx, ch.PAD_T);
+          ctx.lineTo(hx, ch.PAD_T + plotH);
+          ctx.stroke();
+          // value dot on the curve
+          ctx.fillStyle = ch.series.color;
+          ctx.beginPath();
+          ctx.arc(hx, hy, 3, 0, 6.2832);
+          ctx.fill();
+          ctx.fillStyle = U.cssVar('--bg-2') || '#0c1320';
+          ctx.beginPath();
+          ctx.arc(hx, hy, 1.3, 0, 6.2832);
+          ctx.fill();
+        }
+
+        // Draw the now-cursor (1px wide, no allocation)
         var xCursor = ch.PAD_L + xProg * pw;
         ctx.strokeStyle = 'rgba(255,255,255,0.55)';
         ctx.lineWidth = 1;
         ctx.setLineDash(EMPTY_DASH);
         ctx.beginPath();
         ctx.moveTo(xCursor, ch.PAD_T);
-        ctx.lineTo(xCursor, ch.PAD_T + (h - ch.PAD_T - ch.PAD_B));
+        ctx.lineTo(xCursor, ch.PAD_T + plotH);
         ctx.stroke();
 
         // Small triangle marker at top of cursor
@@ -338,6 +412,131 @@
       }
     }
   });
+
+  // ---- Header band: per-channel chip-row ---------------------------------
+  // One row per channel: NOW (accent, change-gated) / MIN / AVG / MAX. Built once;
+  // update() rewrites only the NOW chip (the rest are precomputed constants).
+  function buildHeaderBand(grid) {
+    if (headerBuilt) return;
+    headerBuilt = true;
+
+    var p = U.panel('Historian Wall', { cls: 'col-12 hud', meta: '5 channels · 60 sim-min window', pill: 'LIVE' });
+    var band = el('div', 'thw-band');
+
+    for (var i = 0; i < charts.length; i++) {
+      var ch = charts[i];
+      var s = ch.series;
+      var row = el('div', 'thw-chan');
+
+      // Channel name + colour swatch
+      var nameWrap = el('div', 'thw-name');
+      var sw = el('i', 'thw-sw');
+      sw.style.backgroundColor = s.color;
+      sw.style.boxShadow = '0 0 6px ' + U.hexA(s.color, 0.7);
+      nameWrap.appendChild(sw);
+      nameWrap.appendChild(el('span', 'thw-nm', s.title));
+      nameWrap.appendChild(el('span', 'thw-u', s.unit));
+      row.appendChild(nameWrap);
+
+      // Chip row: now / min / avg / max
+      var cr = el('div', 'chip-row');
+      var ref = { id: s.id, lastNow: '' };
+      ref.now = chip(cr, 'now', '—', 'accent');
+      ref.min = chip(cr, 'min', formatVal(ch.min, s.unit), '');
+      ref.avg = chip(cr, 'avg', formatVal(ch.avg, s.unit), '');
+      ref.max = chip(cr, 'max', formatVal(ch.max, s.unit), '');
+      row.appendChild(cr);
+
+      band.appendChild(row);
+      chipRefs.push(ref);
+    }
+
+    p._body.appendChild(band);
+    grid.appendChild(p);
+  }
+
+  // Build one .chip; return its value span (so update can mutate textContent only).
+  function chip(parent, k, vText, cls) {
+    var c = el('div', 'chip' + (cls ? ' ' + cls : ''));
+    c.appendChild(el('span', 'k', k));
+    var v = el('span', 'v', vText);
+    c.appendChild(v);
+    parent.appendChild(c);
+    return v;
+  }
+
+  // Update the NOW chip for every channel (change-gated text writes).
+  function updateHeaderBand(xProg) {
+    var idx = Math.round(xProg * (N_SAMPLES - 1));
+    if (idx < 0) idx = 0; else if (idx > N_SAMPLES - 1) idx = N_SAMPLES - 1;
+    for (var i = 0; i < chipRefs.length; i++) {
+      var ref = chipRefs[i];
+      var ch = charts[i];
+      var txt = formatVal(ch.vals[idx], ch.series.unit);
+      if (txt !== ref.lastNow) {
+        ref.lastNow = txt;
+        ref.now.textContent = txt;
+      }
+    }
+  }
+
+  // ---- Shared hover tooltip ----------------------------------------------
+  function buildTooltip() {
+    if (tipBuilt) return;
+    tipBuilt = true;
+    tip = el('div', 'thw-tip');
+    var head = el('div', 'thw-tip-h');
+    tipChan = el('span', 'thw-tip-chan', '');
+    tipTime = el('span', 'thw-tip-time', '');
+    head.appendChild(tipChan);
+    head.appendChild(tipTime);
+    tip.appendChild(head);
+    tipVal = el('div', 'thw-tip-val', '');
+    tip.appendChild(tipVal);
+    tip.style.display = 'none';
+    document.body.appendChild(tip);
+  }
+
+  // Wire pointer events on a chart canvas. We only stash the hovered sample index
+  // (hoverIdx) + chart (hoverCh); the per-frame update() does the actual crosshair
+  // redraw by reusing the cached static layer. Tooltip text is change-gated here.
+  function attachHover(ch, canvas) {
+    canvas.addEventListener('mousemove', function (ev) {
+      if (!ch.offscreen) return;
+      var rect = canvas.getBoundingClientRect();
+      var px = ev.clientX - rect.left;
+      var pw = (canvas.offsetWidth || rect.width) - ch.PAD_L - ch.PAD_R;
+      if (pw <= 0) return;
+      var rel = (px - ch.PAD_L) / pw;
+      if (rel < 0) rel = 0; else if (rel > 1) rel = 1;
+      var idx = Math.round(rel * (N_SAMPLES - 1));
+      hoverCh = ch;
+      hoverIdx = idx;
+
+      var s = ch.series;
+      var key = s.id + ':' + idx;
+      if (key !== lastTipKey) {
+        lastTipKey = key;
+        tipChan.textContent = s.title;
+        tipChan.style.color = s.color;
+        tipTime.textContent = timeLabelOf(idx);
+        tipVal.textContent = formatVal(ch.vals[idx], s.unit) + ' ' + s.unit;
+      }
+      // position the fixed tooltip near the pointer (clamped to viewport-ish)
+      tip.style.display = 'block';
+      var tx = ev.clientX + 14;
+      var ty = ev.clientY - 10;
+      var maxX = (window.innerWidth || 1200) - 160;
+      if (tx > maxX) tx = ev.clientX - 150;
+      tip.style.left = tx + 'px';
+      tip.style.top = ty + 'px';
+    });
+    canvas.addEventListener('mouseleave', function () {
+      if (hoverCh === ch) { hoverCh = null; hoverIdx = -1; }
+      lastTipKey = '';
+      if (tip) tip.style.display = 'none';
+    });
+  }
 
   // ---- Build panel meta string ------------------------------------------
   function buildMeta(ch) {
