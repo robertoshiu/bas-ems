@@ -229,12 +229,12 @@ window.BAS = window.BAS || {};
     top.appendChild(clock);
     refs.clock = clock.querySelector('#clk');
 
-    // demo / guided-mode toggle button
+    // guided-tour launch button (replaces the old auto-rotate demo mode)
     var demoBtn = el('button', 'demo-btn');
-    demoBtn.textContent = 'DEMO';
-    demoBtn.title = 'Guided demo mode — auto-rotates modules with live narration (D)';
+    demoBtn.textContent = 'GUIDED TOUR';
+    demoBtn.title = 'Guided tour — a narrated walkthrough of the whole console (D)';
     demoBtn.setAttribute('aria-pressed', 'false');
-    demoBtn.addEventListener('click', function () { demoToggle(); });
+    demoBtn.addEventListener('click', function () { if (BAS.tour) BAS.tour.toggle(); });
     top.appendChild(demoBtn);
     refs.demoBtn = demoBtn;
 
@@ -364,8 +364,10 @@ window.BAS = window.BAS || {};
 
     window.addEventListener('keydown', function (e) {
       if (e.ctrlKey || e.altKey || e.metaKey) return;   // don't hijack browser shortcuts (Alt+←/→ Back/Fwd, Ctrl/Cmd+digit tab switch)
-      // D toggles demo from any focus context (including topbar button focus)
-      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); demoToggle(); return; }
+      // While the guided tour is active it owns the keyboard (captures keys itself) — bail.
+      if (BAS.tour && BAS.tour.active) return;
+      // D toggles the guided tour from any focus context (including topbar button focus)
+      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); if (BAS.tour) BAS.tour.toggle(); return; }
       if (e.target && /input|textarea|button/i.test(e.target.tagName)) return;
       if (e.key === ' ') { e.preventDefault(); BAS.clockSource.togglePlay(); }
       else if (e.key === ',') { e.preventDefault(); BAS.clockSource.step(-1); }
@@ -399,6 +401,19 @@ window.BAS = window.BAS || {};
         }
       }
     });
+
+    // ---- Guided tour wiring ----
+    // The GUIDED TOUR button reflects active state; the tour pushes its on/off
+    // here so the button stays in sync regardless of how it was toggled (button,
+    // D key, or auto-exit). Then offer the first-visit welcome modal.
+    if (BAS.tour) {
+      BAS.tour.onButtonStateChange(function (on) {
+        if (!refs.demoBtn) return;
+        refs.demoBtn.classList.toggle('active', !!on);
+        refs.demoBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      BAS.tour.maybeAutoShow();
+    }
   }
 
   // ---- Dropdown helpers ----

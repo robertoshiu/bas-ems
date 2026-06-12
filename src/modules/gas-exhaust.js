@@ -6,28 +6,34 @@
  * N2 demand tracks Diffusion via frame.load.n2Flow. All shimmer is jitter off
  * frame.tick -> deterministic and loop-identical.
  *
- * Part A: Gas yard SVG schematic (bulk tanks -> headers -> scrubbers/oxidizers).
- * Part B: Production-coupled cabinet states — state derives deterministically
- *   from frame.areaStates[area].Productive/total + P.rand(channel, frame.tick).
- *   No Math.random, no wall-clock. Loop-identical at every t.
+ * Visual upgrade: hero = abatement status wall (.status-card per scrubber/
+ *   oxidizer with E10 state badge, inlet CFM, destruction eff) + big-read
+ *   total exhaust CFM with acid/solvent/heat/general split KPI strip. Gas yard
+ *   schematic gets a HUD frame. Bulk gas usage shown as glow-dot heat tiles.
+ *   Balance tables (bulk yard, exhaust headers, cabinets) preserved.
+ *
+ * Determinism: cabinet/abatement states derive from frame.areaStates +
+ *   P.rand(channel, frame.tick). No Math.random, no wall-clock. Loop-identical.
  */
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master, P = BAS.prng;
 
-  // KPI tiles
-  var kN2, kEx, kAbate, kEff;
+  // ---- hero refs (filled at mount; mutated, never reallocated) -----------
+  var heroRead, heroSub, hk = {};            // big-read CFM + sub + KPI value spans
+  // abatement status-wall card refs
+  var abateCards = [];
+  // bulk gas heat tiles
+  var gasTiles = [];
   // tables
-  var bulkTbl, exHdrTbl, scrubTbl, oxTbl, cabTbl;
-  // sparklines + their canvases
-  var spAcid, spAbate, spN2;
+  var bulkTbl, exHdrTbl, cabTbl;
+  // trend chips + sparklines
+  var spAcid, spAbate, spN2, chips = {};
   // gas yard schematic
   var gasYardSch;
   var fc = 0;
 
   // ---- static per-asset character (deterministic, doesn't shimmer) -------
-  // Bulk gas yard config: header setpoint (bar), purity grade, dewpoint base,
-  // and a fraction of N2 flow used to derive each gas's flow plausibly.
   var GASES = {
     N2:  { name: 'Bulk Nitrogen', hdr: 8.0, purity: 99.9995, dew: -78, flowFrac: 1.00, tank: 86 },
     O2:  { name: 'Bulk Oxygen',   hdr: 7.2, purity: 99.999,  dew: -76, flowFrac: 0.085, tank: 71 },
@@ -36,6 +42,7 @@
     CO2: { name: 'Bulk CO2',      hdr: 6.5, purity: 99.995,  dew: -72, flowFrac: 0.022, tank: 49 },
     He:  { name: 'Bulk Helium',   hdr: 10.0, purity: 99.999, dew: -82, flowFrac: 0.018, tank: 41 }
   };
+  var GAS_ORDER = ['N2', 'O2', 'Ar', 'H2', 'CO2', 'He'];
 
   // Specialty gases assigned to the 10 cabinets (fab-realistic process gases).
   var CABINET_GAS = ['SiH4', 'NH3', 'WF6', 'BCl3', 'Cl2', 'HBr', 'NF3', 'SiH4', 'Cl2', 'NF3'];
@@ -50,50 +57,36 @@
   ];
 
   // Map each cabinet index (0-9) to its process area (for production coupling).
-  // SiH4/BCl3/Cl2/HBr/NF3 are Etch gases; NH3 is Diffusion; WF6 is Thin Film.
   var CABINET_AREA = ['ETCH', 'DIFF', 'THIN', 'ETCH', 'ETCH', 'ETCH', 'ETCH', 'ETCH', 'ETCH', 'ETCH'];
 
-  // Deterministic production-coupled cabinet state.
-  // Derives state from area's productive fraction + per-cabinet hash of frame.tick.
-  // High productive fraction -> higher probability of Online; no randomness.
-  // Returns 'Online' | 'Purge' | 'Standby'.
+  // Deterministic production-coupled cabinet state. Returns Online|Purge|Standby.
   function cabinetState(cabId, areaId, frame) {
     var as = frame.areaStates[areaId];
     var prodFrac = (as && as.total > 0) ? (as.Productive / as.total) : 0.5;
-    // Per-cabinet, per-tick deterministic value [0,1)
     var rv = P.rand('gh:cabst:' + cabId, frame.tick);
-    // Online threshold scales from ~55% at 0% productive to ~95% at 100% productive
     var onlineThr = 0.55 + prodFrac * 0.40;
-    // Purge band is a narrow slice just above the Online threshold
     var purgeThr  = onlineThr + 0.08;
     if (rv < onlineThr)  return 'Online';
     if (rv < purgeThr)   return 'Purge';
     return 'Standby';
   }
 
-  // Gas yard schematic layout: bulk tanks -> main N2 header -> scrubbers/oxidizers.
-  // Coordinates (viewBox 520 x 230). Bulk tanks are identity boxes (no per-gas flow
-  // telemetry exists); live flow is aggregated on the header node (n2Flow).
+  // Gas yard schematic layout (viewBox 520 x 230). Bulk tanks are identity boxes;
+  // live distribution flow is shown on the header node (n2Flow).
   var GY_NODES = [
-    // Bulk tanks (left column) — identity boxes (channel:false → no value); no per-gas
-    // flow telemetry exists, so the aggregate distribution flow is shown on the header only.
     { id: 'n2',    label: 'N2 Bulk',  x: 60,  y: 40,  channel: false },
     { id: 'o2',    label: 'O2 Bulk',  x: 60,  y: 90,  channel: false },
     { id: 'ar',    label: 'Ar Bulk',  x: 60,  y: 140, channel: false },
     { id: 'h2',    label: 'H2 Bulk',  x: 60,  y: 190, channel: false },
-    // Main distribution header (centre)
     { id: 'hdr',   label: 'Gas Hdr',  x: 220, y: 100, channel: 'n2Flow' },
-    // Exhaust treatment (right column)
     { id: 'scrb',  label: 'Scrubber', x: 380, y: 70,  channel: 'exAcidCFM' },
     { id: 'tox',   label: 'Oxidizer', x: 380, y: 155, channel: 'exAcidCFM' }
   ];
   var GY_PIPES = [
-    // Bulk tanks -> main header (flow proportional to n2Flow)
     { from: 'n2',  to: 'hdr', channel: 'n2Flow' },
     { from: 'o2',  to: 'hdr', channel: 'n2Flow' },
     { from: 'ar',  to: 'hdr', channel: 'n2Flow' },
     { from: 'h2',  to: 'hdr', channel: 'n2Flow' },
-    // Header -> exhaust treatment (flow proportional to exAcidCFM)
     { from: 'hdr', to: 'scrb', channel: 'exAcidCFM' },
     { from: 'hdr', to: 'tox',  channel: 'exAcidCFM' }
   ];
@@ -109,80 +102,118 @@
 
       var grid = el('div', 'grid');
 
-      // ---- (1) Gas Yard Schematic ----------------------------------------
-      // Bulk storage -> Distribution Headers -> Exhaust Treatment
+      // ====================================================================
+      // (1) HERO — total exhaust big-read + acid/solvent/heat/general split
+      // ====================================================================
+      var heroP = U.panel('Exhaust & Abatement', { cls: 'col-12 hud', pill: 'LIVE' });
+      var hero = el('div', 'pg-hero');
+
+      var sig = el('div', 'pg-hero-sig');
+      sig.appendChild(el('div', 'pg-hero-label', 'TOTAL EXHAUST'));
+      heroRead = el('div', 'pg-hero-read');
+      var rn = el('span'); heroRead.appendChild(rn);
+      heroRead.appendChild(el('span', 'u', 'kCFM'));
+      heroRead._num = rn;
+      sig.appendChild(heroRead);
+      heroSub = el('div', 'pg-hero-sub'); heroSub.textContent = '—';
+      sig.appendChild(heroSub);
+      hero.appendChild(sig);
+
+      var kpis = el('div', 'pg-hero-kpis');
+      // acid/solvent/heat/general split + abatement load + avg destruction eff
+      [['acid', 'Acid', 'kCFM', 'warn'], ['solvent', 'Solvent', 'kCFM', ''],
+       ['heat', 'Heat', 'kCFM', ''], ['general', 'General', 'kCFM', ''],
+       ['abate', 'Abatement', 'kW', 'accent'], ['eff', 'Destruction', '%', 'good']
+      ].forEach(function (k) {
+        var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
+        box.appendChild(el('div', 'lab', k[1]));
+        var v = el('div', 'v');
+        var vn = el('span'); v.appendChild(vn);
+        v.appendChild(el('span', 'u', k[2]));
+        v._num = vn;
+        box.appendChild(v);
+        kpis.appendChild(box);
+        hk[k[0]] = v;
+      });
+      hero.appendChild(kpis);
+      heroP._body.appendChild(hero);
+      grid.appendChild(heroP);
+
+      // ====================================================================
+      // (2) ABATEMENT STATUS WALL — .status-card per scrubber + oxidizer
+      // ====================================================================
+      var wallP = U.panel('Abatement Status Wall — Wet Scrubbers + Thermal Oxidizers',
+        { cls: 'col-12', meta: 'EXHAUST · destruction eff %', metaId: 'gx-wallmeta' });
+      var wall = el('div', 'gx-wall');
+      // 4 scrubbers then 2 oxidizers
+      M.facility.scrubbers.forEach(function (s, i) { wall.appendChild(buildAbateCard('scrub', s, i)); });
+      M.facility.oxidizers.forEach(function (o, i) { wall.appendChild(buildAbateCard('ox', o, i)); });
+      wallP._body.appendChild(wall);
+      grid.appendChild(wallP);
+
+      // ====================================================================
+      // (3) GAS YARD SCHEMATIC (HUD frame)
+      // ====================================================================
       var schP = U.panel('Gas Yard — Bulk Storage → Distribution → Exhaust Treatment',
-        { cls: 'col-12', bodyCls: 'flush', meta: 'GAS \xb7 BACnet', metaId: 'gh-schmeta' });
+        { cls: 'col-7 hud', bodyCls: 'flush', meta: 'GAS \xb7 BACnet', metaId: 'gh-schmeta' });
       gasYardSch = U.Schematic(schP._body, {
-        nodes: GY_NODES,
-        pipes: GY_PIPES,
-        width: 520, height: 230, fontScale: 0.8
+        nodes: GY_NODES, pipes: GY_PIPES, width: 520, height: 230, fontScale: 0.8
       });
       grid.appendChild(schP);
 
-      // ---- (2) Top KPI strip --------------------------------------------
-      var kpiP = U.panel('Gas & Abatement Overview', { cls: 'col-12', bodyCls: 'tight' });
-      var krow = el('div', 'kpi-row');
-      kN2 = U.kpi({ label: 'N2 Demand', unit: 'Nm3/h', accent: true });
-      kEx = U.kpi({ label: 'Total Exhaust', unit: 'kCFM' });
-      kAbate = U.kpi({ label: 'Abatement Load', unit: 'kW' });
-      kEff = U.kpi({ label: 'Avg Destruction Eff', unit: '%' });
-      [kN2, kEx, kAbate, kEff].forEach(function (k) { krow.appendChild(k.node); });
-      kpiP._body.appendChild(krow);
-      grid.appendChild(kpiP);
+      // ====================================================================
+      // (4) BULK GAS USAGE — glow-dot heat tiles (one per bulk gas)
+      // ====================================================================
+      var usageP = U.panel('Bulk Gas Distribution — Live Flow', { cls: 'col-5', meta: 'Nm³/h · header pressure', metaId: 'gx-usemeta' });
+      var hg = el('div', 'heat-grid');
+      GAS_ORDER.forEach(function (sym) {
+        var g = GASES[sym];
+        var tile = el('div', 'heat-tile ok');
+        var glow = el('i', 'glow');
+        tile.appendChild(glow);
+        tile.appendChild(el('div', 'lab', sym));
+        var v = el('div', 'v'); v.textContent = '—';
+        tile.appendChild(v);
+        var sub = el('div', 'gx-tile-sub'); sub.textContent = g.hdr.toFixed(1) + ' bar';
+        tile.appendChild(sub);
+        hg.appendChild(tile);
+        gasTiles.push({ sym: sym, g: g, glow: glow, v: v, sub: sub, lastV: -1 });
+      });
+      usageP._body.appendChild(hg);
+      grid.appendChild(usageP);
 
-      // ---- (3) Bulk Gas Yard --------------------------------------------
+      // ====================================================================
+      // (5) BULK GAS YARD TABLE
+      // ====================================================================
       var bulkP = U.panel('Bulk Gas Yard — Headers & Storage', { cls: 'col-6', bodyCls: 'flush', meta: 'GAS · BACnet', metaId: 'gh-bulkmeta' });
       bulkTbl = U.table([
         { label: 'Gas', key: 'gas', tdCls: 'name' },
         { label: 'Header bar', key: 'hdr', tdCls: 'num' },
         { label: 'Flow Nm3/h', key: 'flow', tdCls: 'num' },
-        { label: 'Tank %', render: function (r) { return meter(r.tank, r.tankCls, r.tank.toFixed(0) + '%'); } },
+        { label: 'Tank %', render: function (r) { return meterCell(r.tank, r.tankCls, r.tank.toFixed(0) + '%'); } },
         { label: 'Purity %', key: 'purity', tdCls: 'num' },
         { label: 'Dewpt °C', render: function (r) { return '<span class="num">' + r.dew + '</span>'; }, tdCls: 'num' }
       ], { maxH: '252px' });
       bulkP._body.appendChild(bulkTbl.node);
       grid.appendChild(bulkP);
 
-      // ---- (4) Exhaust & Abatement --------------------------------------
-      var exP = U.panel('Exhaust & Abatement — Segregated Headers', { cls: 'col-6', bodyCls: 'tight', meta: '', metaId: 'gh-exmeta' });
-
-      var lblHdr = el('div', 'dim'); lblHdr.style.cssText = 'font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.06em;margin:0 0 4px';
-      lblHdr.textContent = 'Exhaust Headers (general / heat / acid / solvent)';
-      exP._body.appendChild(lblHdr);
+      // ====================================================================
+      // (6) EXHAUST HEADERS — segregated balance table
+      // ====================================================================
+      var exP = U.panel('Segregated Exhaust Headers — Flow Balance', { cls: 'col-6', meta: 'general / heat / acid / solvent', metaId: 'gh-exmeta' });
       exHdrTbl = U.table([
         { label: 'Header', key: 'hdr', tdCls: 'name' },
         { label: 'Flow CFM', key: 'flow', tdCls: 'num' },
+        { label: 'Share', render: function (r) { return '<span class="td-meter ' + r.shareCls + '"><i style="width:' + r.sharePct + '%"></i></span>'; } },
         { label: 'dP Pa', key: 'dp', tdCls: 'num' },
         { label: 'Status', render: function (r) { return U.stateBadge(r.state).outerHTML; } }
       ]);
       exP._body.appendChild(exHdrTbl.node);
-
-      var lblScr = el('div', 'dim'); lblScr.style.cssText = 'font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px';
-      lblScr.textContent = 'Wet Scrubbers — acid/corrosive abatement';
-      exP._body.appendChild(lblScr);
-      scrubTbl = U.table([
-        { label: 'Scrubber', key: 'name', tdCls: 'name' },
-        { label: 'Destr %', render: function (r) { return '<span class="num">' + r.eff + '</span>'; }, tdCls: 'num' },
-        { label: 'Blower kW', key: 'kw', tdCls: 'num' },
-        { label: 'pH', render: function (r) { return phCell(r.ph); }, tdCls: 'num' },
-        { label: 'Recirc L/m', key: 'recirc', tdCls: 'num' }
-      ]);
-      exP._body.appendChild(scrubTbl.node);
-
-      var lblOx = el('div', 'dim'); lblOx.style.cssText = 'font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px';
-      lblOx.textContent = 'Thermal Oxidizers — pyrophoric/VOC destruction';
-      exP._body.appendChild(lblOx);
-      oxTbl = U.table([
-        { label: 'Oxidizer', key: 'name', tdCls: 'name' },
-        { label: 'Stack °C', key: 'stack', tdCls: 'num' },
-        { label: 'Destr %', render: function (r) { return '<span class="num">' + r.eff + '</span>'; }, tdCls: 'num' },
-        { label: 'Fuel Nm3/h', key: 'fuel', tdCls: 'num' }
-      ]);
-      exP._body.appendChild(oxTbl.node);
       grid.appendChild(exP);
 
-      // ---- (5) Specialty Gas Cabinets -----------------------------------
+      // ====================================================================
+      // (7) SPECIALTY GAS CABINETS
+      // ====================================================================
       var cabP = U.panel('Specialty Gas Cabinets — Process Gas Distribution', { cls: 'col-12', bodyCls: 'flush', meta: '', metaId: 'gh-cabmeta' });
       cabTbl = U.table([
         { label: 'Cabinet', key: 'name', tdCls: 'name' },
@@ -190,16 +221,18 @@
         { label: 'Hazard', render: function (r) { return r.haz; } },
         { label: 'Status', render: function (r) { return U.stateBadge(r.state).outerHTML; } },
         { label: 'Header mTorr', key: 'mtorr', tdCls: 'num' },
-        { label: 'Cylinder %', render: function (r) { return meter(r.cyl, r.cylCls, r.cyl.toFixed(0) + '%'); } },
+        { label: 'Cylinder %', render: function (r) { return meterCell(r.cyl, r.cylCls, r.cyl.toFixed(0) + '%'); } },
         { label: 'Purge N2 sccm', key: 'purge', tdCls: 'num' }
       ], { maxH: '320px' });
       cabP._body.appendChild(cabTbl.node);
       grid.appendChild(cabP);
 
-      // ---- (6) Trends ---------------------------------------------------
-      spAcid = makeSpark(grid, 'Acid Exhaust Header', 'CFM', U.cssVar('--warn'));
-      spAbate = makeSpark(grid, 'Abatement Load', 'kW', U.cssVar('--accent'));
-      spN2 = makeSpark(grid, 'N2 Bulk Demand', 'Nm3/h', U.cssVar('--accent-2'));
+      // ====================================================================
+      // (8) TRENDS — chip headers + sparklines
+      // ====================================================================
+      spAcid = makeSpark(grid, 'Acid Exhaust Header', 'CFM', U.cssVar('--warn'), 'acid');
+      spAbate = makeSpark(grid, 'Abatement Load', 'kW', U.cssVar('--accent'), 'abate');
+      spN2 = makeSpark(grid, 'N2 Bulk Demand', 'Nm3/h', U.cssVar('--accent-2'), 'n2');
 
       root.appendChild(grid);
     },
@@ -217,29 +250,80 @@
       var totalCFM = exGen + exHeat + exAcid + exSol;
       var abate = L.abateKW + U.jitter('gh:abk', tk, 4);
 
-      // Destruction efficiency: ~99.2% baseline, eases down slightly as acid
-      // load climbs (more challenging gas to abate), shimmered.
-      var acidLoadFrac = clamp((exAcid - 86000) / 18000, 0, 1);   // 0..1 over the loop band
+      // Destruction efficiency: ~99.3% baseline, eases down as acid load climbs.
+      var acidLoadFrac = clamp((exAcid - 86000) / 18000, 0, 1);
       var avgEff = 99.35 - acidLoadFrac * 0.22 + U.jitter('gh:eff', tk, 0.04);
 
-      // ---- Gas yard schematic (every frame — Schematic throttles internally) -
+      // ---- Gas yard schematic (Schematic throttles internally) ----------
       gasYardSch.update(frame);
 
-      // ---- KPIs ----------------------------------------------------------
-      kN2.set(U.group(Math.round(n2)), { delta: U.fmt.delta((n2 - 14000) / 140, 1, '%'), dir: n2 >= 14000 ? 'up' : 'down' });
-      kEx.set((totalCFM / 1000).toFixed(1), { delta: U.fmt.delta((totalCFM - 415000) / 4150, 1, '%'), dir: totalCFM >= 415000 ? 'up' : 'down' });
-      kAbate.set(Math.round(abate), { delta: U.fmt.delta(abate - 1800, 0, ' kW'), dir: abate >= 1800 ? 'up' : 'down', state: U.band(abate, 2100, 2400) });
-      kEff.set(avgEff.toFixed(2), { state: U.band(avgEff, 99.0, 98.7, true) });
+      // ---- HERO (every frame — cheap text writes, change-gated by widget-free guards)
+      heroRead._num.textContent = (totalCFM / 1000).toFixed(1);
+      heroSub.textContent = Math.round(totalCFM / 1000) + ' kCFM moved · ' + avgEff.toFixed(2) + '% avg destruction';
+      hk.acid._num.textContent = (exAcid / 1000).toFixed(1);
+      hk.solvent._num.textContent = (exSol / 1000).toFixed(1);
+      hk.heat._num.textContent = (exHeat / 1000).toFixed(1);
+      hk.general._num.textContent = (exGen / 1000).toFixed(1);
+      hk.abate._num.textContent = Math.round(abate);
+      hk.eff._num.textContent = avgEff.toFixed(2);
 
       // ---- sparklines: push + render every frame ------------------------
       spAcid.push(exAcid); spAcid.render();
       spAbate.push(abate); spAbate.render();
       spN2.push(n2); spN2.render();
 
-      // ---- throttled table / innerHTML rebuilds -------------------------
+      // ---- abatement status wall (throttle every 8) ---------------------
       if (fc % 8 === 0) {
-        // (3) Bulk gas yard
-        bulkTbl.set(Object.keys(GASES).map(function (sym) {
+        // scrubbers: destruction eff + blower kW couple to acid load
+        for (var si = 0; si < abateCards.length; si++) {
+          var c = abateCards[si];
+          if (c.kind === 'scrub') {
+            var eff = 99.4 - acidLoadFrac * 0.25 + U.jitter('gh:scef:' + c.id, tk, 0.05) - c.idx * 0.03;
+            var kw = 95 + acidLoadFrac * 30 + c.idx * 8 + U.jitter('gh:sckw:' + c.id, tk, 1.5);
+            var ph = 7.0 + U.jitter('gh:scph:' + c.id, tk, 0.18);
+            var recirc = 420 + c.idx * 25 + U.jitter('gh:scrc:' + c.id, tk, 6);
+            var inlet = (exAcid * (0.27 + c.idx * 0.01)) + U.jitter('gh:scin:' + c.id, tk, 400);
+            // health: pH drifting acidic or eff sagging -> warn/bad
+            var st = (ph < 6.4 || eff < 99.0) ? 'bad' : (ph < 6.8 || eff < 99.15) ? 'warn' : 'ok';
+            setAbateCard(c, st, eff.toFixed(2), [
+              ['Inlet', U.group(Math.round(inlet)) + ' CFM'],
+              ['Blower', Math.round(kw) + ' kW'],
+              ['Liquor pH', ph.toFixed(2)],
+              ['Recirc', Math.round(recirc) + ' L/m']
+            ]);
+          } else {
+            var oeff = 99.6 - acidLoadFrac * 0.12 + U.jitter('gh:oxef:' + c.id, tk, 0.03) - c.idx * 0.04;
+            var stack = 760 + U.jitter('gh:oxst:' + c.id, tk, 6) + c.idx * 4;
+            var fuel = 38 + acidLoadFrac * 10 + c.idx * 3 + U.jitter('gh:oxfu:' + c.id, tk, 0.8);
+            var oin = (exSol * (0.5 + c.idx * 0.02)) + U.jitter('gh:oxin:' + c.id, tk, 350);
+            var ost = (stack < 740 || oeff < 99.3) ? 'warn' : 'ok';
+            setAbateCard(c, ost, oeff.toFixed(2), [
+              ['Inlet', U.group(Math.round(oin)) + ' CFM'],
+              ['Stack', Math.round(stack) + ' °C'],
+              ['Fuel', fuel.toFixed(1) + ' Nm³/h'],
+              ['Type', 'VOC / pyro']
+            ]);
+          }
+        }
+
+        // ---- bulk gas usage heat tiles --------------------------------
+        for (var gi = 0; gi < gasTiles.length; gi++) {
+          var gt = gasTiles[gi];
+          var flow = gt.sym === 'N2' ? n2 : (n2 * gt.g.flowFrac + U.jitter('gh:bf:' + gt.sym, tk, n2 * gt.g.flowFrac * 0.012));
+          var hdr = gt.g.hdr + U.jitter('gh:bh:' + gt.sym, tk, 0.06);
+          var rf = Math.round(flow);
+          if (rf !== gt.lastV) {
+            gt.lastV = rf;
+            gt.v.textContent = U.group(rf);
+            gt.sub.textContent = hdr.toFixed(1) + ' bar';
+            // glow intensity from share of N2 (the dominant flow); cap 0.55
+            var inten = clamp(0.10 + (flow / n2) * 0.5, 0.10, 0.55);
+            gt.glow.style.opacity = inten.toFixed(2);
+          }
+        }
+
+        // ---- bulk gas yard table --------------------------------------
+        bulkTbl.set(GAS_ORDER.map(function (sym) {
           var g = GASES[sym];
           var flow = sym === 'N2' ? n2 : (n2 * g.flowFrac + U.jitter('gh:bf:' + sym, tk, n2 * g.flowFrac * 0.012));
           var hdr = g.hdr + U.jitter('gh:bh:' + sym, tk, 0.06);
@@ -249,57 +333,37 @@
             gas: g.name + ' (' + sym + ')',
             hdr: hdr.toFixed(2),
             flow: U.group(Math.round(flow)),
-            tank: tank, tankCls: U.band(tank, 35, 25, true) === 'good' ? 'good' : U.band(tank, 35, 25, true),
-            purity: g.purity.toFixed(g.purity >= 99.9999 ? 4 : g.purity >= 99.999 ? 3 : 3),
+            tank: tank, tankCls: U.band(tank, 35, 25, true),
+            purity: g.purity.toFixed(g.purity >= 99.9999 ? 4 : 3),
             dew: dew
           };
         }));
 
-        // (4a) Exhaust headers
-        exHdrTbl.set(EX_HEADERS.map(function (h) {
-          var f = (frame.load[h.chan] || 0) + U.jitter('gh:ehf:' + h.key, tk, 600);
+        // ---- exhaust headers (with share meter) -----------------------
+        var hdrFlows = EX_HEADERS.map(function (h) { return (frame.load[h.chan] || 0) + U.jitter('gh:ehf:' + h.key, tk, 600); });
+        var maxF = Math.max.apply(null, hdrFlows);
+        exHdrTbl.set(EX_HEADERS.map(function (h, hi) {
+          var f = hdrFlows[hi];
           var dp = h.dp + U.jitter('gh:ehd:' + h.key, tk, 6);
-          // dP out of band -> filter loading / damper fault; here always nominal.
           var st = dp > h.dp + 90 ? 'Standby' : 'Productive';
-          return { hdr: h.key + ' (' + h.seg + ')', flow: U.group(Math.round(f)), dp: Math.round(dp), state: st };
-        }));
-
-        // (4b) Wet scrubbers — couple destruction eff + blower to acid load
-        scrubTbl.set(M.facility.scrubbers.map(function (s, i) {
-          var eff = 99.4 - acidLoadFrac * 0.25 + U.jitter('gh:scef:' + s.id, tk, 0.05) - i * 0.03;
-          var kw = 95 + acidLoadFrac * 30 + i * 8 + U.jitter('gh:sckw:' + s.id, tk, 1.5);
-          var ph = 7.0 + U.jitter('gh:scph:' + s.id, tk, 0.18);
-          var recirc = 420 + i * 25 + U.jitter('gh:scrc:' + s.id, tk, 6);
+          var sharePct = clamp(f / maxF * 100, 2, 100);
+          var shareCls = h.seg === 'acid' ? 'warn' : h.seg === 'solvent' ? 'bad' : 'good';
           return {
-            name: 'Wet Scrubber ' + (i + 1),
-            eff: eff.toFixed(2), kw: Math.round(kw),
-            ph: ph, recirc: Math.round(recirc)
+            hdr: h.key + ' (' + h.seg + ')', flow: U.group(Math.round(f)),
+            sharePct: sharePct.toFixed(0), shareCls: shareCls,
+            dp: Math.round(dp), state: st
           };
         }));
 
-        // (4c) Thermal oxidizers
-        oxTbl.set(M.facility.oxidizers.map(function (o, i) {
-          var stack = 760 + U.jitter('gh:oxst:' + o.id, tk, 6) + i * 4;
-          var eff = 99.6 - acidLoadFrac * 0.12 + U.jitter('gh:oxef:' + o.id, tk, 0.03) - i * 0.04;
-          var fuel = 38 + acidLoadFrac * 10 + i * 3 + U.jitter('gh:oxfu:' + o.id, tk, 0.8);
-          return {
-            name: 'Thermal Oxidizer ' + (i + 1),
-            stack: Math.round(stack), eff: eff.toFixed(2), fuel: fuel.toFixed(1)
-          };
-        }));
-
-        // (5) Specialty gas cabinets — production-coupled, deterministic states.
-        // State derives from frame.areaStates[area].Productive/total + P.rand(id, tick).
-        // No Math.random. Identical for same frame.tick on every loop pass.
-        cabTbl.set(M.facility.gasCabinets.map(function (c, i) {
+        // ---- specialty gas cabinets -----------------------------------
+        cabTbl.set(M.facility.gasCabinets.map(function (cc, i) {
           var gas = CABINET_GAS[i % CABINET_GAS.length];
           var area = CABINET_AREA[i % CABINET_AREA.length];
-          var state = cabinetState(c.id, area, frame);
-          // Cylinder % is stable (changes slowly via jitter off tick, not per-second)
-          var cyl = clamp(20 + P.rand('gh:cyl:' + c.id, 0) * 70 + U.jitter('gh:cylj:' + c.id, tk, 0.3), 4, 99);
-          var mtorr = state === 'Online' ? Math.round(760 + U.jitter('gh:cmt:' + c.id, tk, 8)) : 0;
-          var purge = state === 'Purge' ? Math.round(2000 + U.jitter('gh:cpg:' + c.id, tk, 40))
-            : Math.round(120 + U.jitter('gh:cpgi:' + c.id, tk, 8));
+          var state = cabinetState(cc.id, area, frame);
+          var cyl = clamp(20 + P.rand('gh:cyl:' + cc.id, 0) * 70 + U.jitter('gh:cylj:' + cc.id, tk, 0.3), 4, 99);
+          var mtorr = state === 'Online' ? Math.round(760 + U.jitter('gh:cmt:' + cc.id, tk, 8)) : 0;
+          var purge = state === 'Purge' ? Math.round(2000 + U.jitter('gh:cpg:' + cc.id, tk, 40))
+            : Math.round(120 + U.jitter('gh:cpgi:' + cc.id, tk, 8));
           return {
             name: 'Gas Cabinet ' + (i + 1),
             gas: gas,
@@ -311,24 +375,80 @@
           };
         }));
       }
+
+      // ---- trend chips (throttle every 16) ------------------------------
+      if (fc % 16 === 0) {
+        setChip(chips.acid, exAcid / 1000, 1);
+        setChip(chips.abate, abate, 0);
+        setChip(chips.n2, n2 / 1000, 2);
+      }
     }
   });
+
+  // ---- abatement status-card builder ------------------------------------
+  function buildAbateCard(kind, asset, idx) {
+    var card = el('div', 'status-card ok');
+    var headRow = el('div', 'sc-head');
+    headRow.appendChild(el('div', 'sc-name', asset.name));
+    var badgeSlot = el('span', 'gx-badge-slot');
+    badgeSlot.appendChild(U.stateBadge('Productive'));
+    headRow.appendChild(badgeSlot);
+    card.appendChild(headRow);
+
+    // destruction-efficiency big read
+    var effRow = el('div', 'gx-eff');
+    var en = el('span', 'gx-eff-v', '—');
+    effRow.appendChild(en);
+    effRow.appendChild(el('span', 'gx-eff-u', '% destruction'));
+    card.appendChild(effRow);
+
+    var stats = el('div', 'sc-stats');
+    var statRefs = [];
+    for (var i = 0; i < 4; i++) {
+      var sline = el('div', 'sc-stat');
+      var k = el('span', 'k', '');
+      var val = el('span', 'val', '—');
+      sline.appendChild(k); sline.appendChild(val);
+      stats.appendChild(sline);
+      statRefs.push({ k: k, val: val });
+    }
+    card.appendChild(stats);
+
+    var ref = {
+      kind: kind, id: asset.id, idx: idx, card: card,
+      badgeSlot: badgeSlot, effV: en, stats: statRefs,
+      lastState: 'ok', lastEff: ''
+    };
+    abateCards.push(ref);
+    return card;
+  }
+
+  // ---- abatement card writer (change-gated) -----------------------------
+  function setAbateCard(c, healthState, effTxt, rows) {
+    if (healthState !== c.lastState) {
+      c.lastState = healthState;
+      c.card.className = 'status-card ' + healthState;
+      // refresh state badge: ok -> Productive, warn -> Engineering, bad -> Unscheduled Down
+      var badgeName = healthState === 'ok' ? 'Productive' : healthState === 'warn' ? 'Engineering' : 'Unscheduled Down';
+      U.clear(c.badgeSlot);
+      c.badgeSlot.appendChild(U.stateBadge(badgeName));
+    }
+    if (effTxt !== c.lastEff) { c.lastEff = effTxt; c.effV.textContent = effTxt; }
+    for (var i = 0; i < rows.length && i < c.stats.length; i++) {
+      var s = c.stats[i];
+      if (s.k.textContent !== rows[i][0]) s.k.textContent = rows[i][0];
+      if (s.val.textContent !== rows[i][1]) s.val.textContent = rows[i][1];
+    }
+  }
 
   // ---- helpers -----------------------------------------------------------
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
-  function meter(pct, cls, label) {
+  function meterCell(pct, cls, label) {
     pct = clamp(pct, 0, 100);
     return '<div style="display:flex;align-items:center;gap:7px">' +
       '<div class="meter ' + (cls || 'good') + '" style="flex:1;min-width:46px"><i style="width:' + pct.toFixed(0) + '%"></i></div>' +
       '<span class="num" style="min-width:34px;text-align:right">' + label + '</span></div>';
-  }
-
-  function phCell(ph) {
-    // Scrubber liquor should be near-neutral (~7.0 with caustic dosing);
-    // drifting acidic (<6.4) means dosing is falling behind the acid load.
-    var st = ph < 6.4 ? 'bad' : ph < 6.8 ? 'warn' : 'good';
-    return '<span class="num" style="color:var(--' + st + ')">' + ph.toFixed(2) + '</span>';
   }
 
   function hazTag(h) {
@@ -339,17 +459,35 @@
 
   // Map cabinet status words to E10-flavored badge classes already in the CSS.
   function stateBadgeName(state) {
-    // 'Online' -> Productive (green), 'Purge' -> Engineering (purple), 'Standby' -> Standby (blue)
     if (state === 'Online') return 'Productive';
     if (state === 'Purge') return 'Engineering';
     return 'Standby';
   }
 
-  function makeSpark(grid, title, unit, color) {
-    var p = U.panel(title, { cls: 'col-4', bodyCls: 'flush', meta: unit, metaId: '' });
-    var c = el('canvas', 'spark'); c.style.height = '88px'; c.style.width = '100%';
+  // min/avg/max readout chips for a trend header.
+  function setChip(c, v, dp) {
+    if (v < c.min) c.min = v;
+    if (v > c.max) c.max = v;
+    c.minEl.textContent = c.min.toFixed(dp);
+    c.maxEl.textContent = c.max.toFixed(dp);
+    c.nowEl.textContent = v.toFixed(dp);
+  }
+
+  function makeSpark(grid, title, unit, color, chipKey) {
+    var p = U.panel(title, { cls: 'col-4', meta: unit, metaId: '' });
+    var row = el('div', 'chip-row gx-chip-row');
+    var nowChip = el('div', 'chip accent'); nowChip.innerHTML = '<span class="k">NOW</span><span class="v">—</span>';
+    var minChip = el('div', 'chip'); minChip.innerHTML = '<span class="k">MIN</span><span class="v">—</span>';
+    var maxChip = el('div', 'chip'); maxChip.innerHTML = '<span class="k">MAX</span><span class="v">—</span>';
+    row.appendChild(nowChip); row.appendChild(minChip); row.appendChild(maxChip);
+    p._body.appendChild(row);
+    var c = el('canvas', 'spark'); c.style.height = '78px'; c.style.width = '100%';
     p._body.appendChild(c);
     grid.appendChild(p);
-    return U.Sparkline(c, { height: 88, color: color, fill: true });
+    chips[chipKey] = {
+      min: Infinity, max: -Infinity,
+      nowEl: nowChip.querySelector('.v'), minEl: minChip.querySelector('.v'), maxEl: maxChip.querySelector('.v')
+    };
+    return U.Sparkline(c, { height: 78, color: color, fill: true });
   }
 })(window.BAS);

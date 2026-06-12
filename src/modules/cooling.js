@@ -2,12 +2,25 @@
  * Classic script -> registers module 'cooling'
  * Cooling load tracks production via frame.load.chwRT / chwKW / pcwRT; chillers
  * stage by load; per-equipment shimmer is deterministic off frame.tick.
+ *
+ * Visual upgrade: a hero band (col-12 .panel.hud .pg-hero) with a signature
+ * plant-efficiency dial (kW/RT, lower=better -> inverted thresholds), a big-read
+ * plant-kW numeral and a KPI strip (total RT, CHWS/CHWR, tower status, PCW load).
+ * The P&ID schematic keeps its panel (now hud-framed). The chiller table gains
+ * inline .td-meter load bars and state-coloured status dots; PCW/tower tables and
+ * the trend sparklines + plant facts are preserved.
+ *
+ * Constraints honoured: classic IIFE, file://-safe (inline SVG / DOM only), zero
+ * per-frame allocation (refs built at mount, mutated in update, change-gated +
+ * throttled), all data from `frame` / BAS.master, reduced-motion aware.
  */
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, fmt = U.fmt, M = BAS.master;
 
-  var kLoad, kPower, kEff, kTemps;             // top KPIs
+  var effDial;                                 // hero signature: plant efficiency kW/RT
+  var heroKW, heroSub;                         // hero big-read plant kW + sub-line
+  var hk = {};                                 // hero KPI value spans
   var chillerTbl, pcwTbl, ctTbl;               // tables
   var sLoad, sPower;                           // sparklines
   var schematic;                               // P&ID schematic widget
@@ -30,30 +43,67 @@
 
       var grid = el('div', 'grid');
 
-      // ---- Chiller Plant P&ID Schematic (col-12, top of view) -----------
-      // Layout (viewBox 560x200):
-      //   Chillers (left column, 6 nodes in 2 cols) → CHW Header → Process Load
-      //   Cooling Towers (top right) → CW Header
-      //
+      // ---- Row 1: hero band (col-12, hud) ------------------------------
+      // Signature dial = plant efficiency (kW/RT). Lower is better, so thresholds
+      // are inverted: green below ~0.62, amber to ~0.72, red above. Big-read shows
+      // live plant kW; the KPI strip carries the headline plant figures.
+      var heroP = U.panel('Cooling Plant', { cls: 'col-12 hud', pill: 'LIVE' });
+      var hero = el('div', 'pg-hero cw-hero');
+
+      var sig = el('div', 'pg-hero-sig center');
+      sig.appendChild(el('div', 'pg-hero-label', 'PLANT EFFICIENCY'));
+      effDial = U.dial({
+        size: 168, label: 'kW / RT', unit: 'kW/RT', min: 0, max: 1.0, glow: true,
+        fmt: function (v) { return v.toFixed(3); },
+        thresholds: { warn: 0.62, bad: 0.72, invert: true }   // lower = better
+      });
+      sig.appendChild(effDial.el);
+      // big-read plant kW under the dial
+      var read = el('div', 'pg-hero-read cw-hero-read');
+      var rn = el('span'); read.appendChild(rn);
+      read.appendChild(el('span', 'u', 'kW'));
+      read._num = rn; heroKW = read;
+      sig.appendChild(read);
+      heroSub = el('div', 'pg-hero-sub'); heroSub.textContent = '—';
+      sig.appendChild(heroSub);
+      hero.appendChild(sig);
+
+      // right KPI strip — preserves the four headline figures the page showed.
+      var kpis = el('div', 'pg-hero-kpis');
+      [['load', 'Total Cooling', 'RT', 'accent'],
+       ['temps', 'CHWS / CHWR', '°C', ''],
+       ['towers', 'Towers', 'on', 'good'],
+       ['pcw', 'PCW Load', 'RT', ''],
+       ['stage', 'Chillers Staged', '', '']
+      ].forEach(function (k) {
+        var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
+        box.appendChild(el('div', 'lab', k[1]));
+        var v = el('div', 'v');
+        var vn = el('span'); v.appendChild(vn);
+        if (k[2]) v.appendChild(el('span', 'u', k[2]));
+        v._num = vn;
+        box.appendChild(v);
+        kpis.appendChild(box);
+        hk[k[0]] = v;
+      });
+      hero.appendChild(kpis);
+      heroP._body.appendChild(hero);
+      grid.appendChild(heroP);
+
+      // ---- Chiller Plant P&ID Schematic (col-12, hud) -------------------
       // Real frame.load channels used:
       //   chwKW  (~6490 kW)  — chiller plant kW → drives flow on CHW pipes
       //   chwRT  (~10701 RT) — total cooling tons → drives flow on CT pipes
       //   pcwRT  (~3170 RT)  — process cooling tons → CW header node live value
-      //
-      // Each node: one live value via 'channel' field (schematic API constraint).
-      // Detailed per-unit metrics (CHWS/CHWR temps, per-chiller kW) stay in tables.
       var schP = U.panel('Chiller Plant P&ID — Schematic Overview', {
-        cls: 'col-12',
+        cls: 'col-12 hud',
         meta: 'CHW · CW · PCW',
         metaId: 'schematic-meta'
       });
 
-      // Node coordinates for a 560×200 viewBox:
-      //   CHLR-01..03  x=10,  y=18/68/118    CHLR-04..06  x=80, y=18/68/118
-      //   CHW-HDR      x=168, y=68           PROC (load)  x=270, y=68
-      //   CT-01..03    x=370, y=10/68/126    CW-HDR       x=465, y=68
-      // Node value labels all show cooling tons (chwRT/pcwRT) for a consistent unit;
-      // pipe flow speed is driven by chwKW (electrical load proxy). Return lines omitted for clarity.
+      // Node coordinates for a 560×200 viewBox (chillers → CHW header → process
+      // load; cooling towers → CW header). Each node shows cooling tons for a
+      // consistent unit; pipe flow speed is driven by chwKW (electrical proxy).
       schematic = U.Schematic(schP._body, {
         width: 560,
         height: 200,
@@ -96,23 +146,13 @@
 
       grid.appendChild(schP);
 
-      // ---- top KPIs (each KPI lives in a col-3 panel) -------------------
-      kLoad  = U.kpi({ label: 'Total Cooling Load', unit: 'RT', accent: true });
-      kPower = U.kpi({ label: 'Plant Power', unit: 'MW' });
-      kEff   = U.kpi({ label: 'Plant Efficiency', unit: 'kW/RT' });
-      kTemps = U.kpi({ label: 'CHWS / CHWR', unit: '°C' });
-      grid.appendChild(kpiPanel('Cooling Load', kLoad));
-      grid.appendChild(kpiPanel('Plant Power', kPower));
-      grid.appendChild(kpiPanel('Plant Efficiency', kEff));
-      grid.appendChild(kpiPanel('Chilled Water Temps', kTemps));
-
       // ---- chiller plant + supporting systems (col-8) ------------------
       var leftP = U.panel('Chiller Plant — Central Utility Building', { cls: 'col-8', bodyCls: 'tight', meta: M.facility.chillers.length + ' × ' + RATING_RT + ' RT Centrifugal', metaId: 'chwmeta' });
 
       chillerTbl = U.table([
         { label: 'Chiller', key: 'name', tdCls: 'name' },
-        { label: 'Status', render: function (r) { return U.stateBadge(r.state).outerHTML; } },
-        { label: 'Load %', render: function (r) { return meterCell(r.loadPct); }, tdCls: 'num' },
+        { label: 'Status', render: function (r) { return statusCell(r.state); } },
+        { label: 'Load', render: function (r) { return tdMeterCell(r.loadPct, r.on); }, tdCls: 'num' },
         { label: 'Tonnage', render: function (r) { return r.on ? fmt.int(r.rt) + ' RT' : '—'; }, tdCls: 'num' },
         { label: 'kW', render: function (r) { return r.on ? fmt.int(r.kw) : '—'; }, tdCls: 'num' },
         { label: 'CHWS', render: function (r) { return r.on ? r.chws.toFixed(1) + '°' : '—'; }, tdCls: 'num' },
@@ -122,8 +162,7 @@
       leftP._body.appendChild(chillerTbl.node);
 
       // PCW loops
-      var pcwHd = el('div', 'dim'); pcwHd.style.margin = '12px 0 4px'; pcwHd.style.fontSize = 'var(--fs-1)';
-      pcwHd.style.letterSpacing = '.06em'; pcwHd.style.textTransform = 'uppercase';
+      var pcwHd = el('div', 'dim cw-subhd');
       pcwHd.textContent = 'Process Cooling Water Loops  ·  20 °C Setpoint';
       leftP._body.appendChild(pcwHd);
       pcwTbl = U.table([
@@ -137,8 +176,7 @@
       leftP._body.appendChild(pcwTbl.node);
 
       // Cooling towers
-      var ctHd = el('div', 'dim'); ctHd.style.margin = '12px 0 4px'; ctHd.style.fontSize = 'var(--fs-1)';
-      ctHd.style.letterSpacing = '.06em'; ctHd.style.textTransform = 'uppercase';
+      var ctHd = el('div', 'dim cw-subhd');
       ctHd.textContent = 'Cooling Towers  ·  Condenser-Water Heat Rejection';
       leftP._body.appendChild(ctHd);
       ctTbl = U.table([
@@ -146,7 +184,7 @@
         { label: 'Cells', key: 'cells', tdCls: 'num' },
         { label: 'Basin', render: function (r) { return r.basin.toFixed(1) + '°'; }, tdCls: 'num' },
         { label: 'Range', render: function (r) { return r.range.toFixed(1) + '°'; }, tdCls: 'num' },
-        { label: 'Fan VFD', render: function (r) { return meterCell(r.vfd); }, tdCls: 'num' }
+        { label: 'Fan VFD', render: function (r) { return tdMeterCell(r.vfd, true); }, tdCls: 'num' }
       ]);
       leftP._body.appendChild(ctTbl.node);
 
@@ -173,8 +211,7 @@
       facts.appendChild(statLine('Design Capacity', DESIGN_RT.toLocaleString() + ' RT'));
       facts.appendChild(statLine('CHW Setpoint', CHWS_SET.toFixed(1) + ' / ' + CHWR_SET.toFixed(1) + ' °C'));
       facts.appendChild(statLine('Distribution', M.facility.chwPumps.length + ' CHW pumps · VPF'));
-      var cwRow = statLine('Condenser Water', M.facility.coolingTowers.length + ' towers');
-      facts.appendChild(cwRow);
+      facts.appendChild(statLine('Condenser Water', M.facility.coolingTowers.length + ' towers'));
       rightP._body.appendChild(facts);
 
       grid.appendChild(rightP);
@@ -203,21 +240,30 @@
       var chws = CHWS_SET + U.jitter('chws', tick, 0.12);
       var chwr = CHWR_SET + (loadFrac - 1) * 0.7 + U.jitter('chwr', tick, 0.18);
 
+      // chiller staging (also drives the hero "staged" KPI + table)
+      var nChillers = M.facility.chillers.length;
+      var running = Math.max(1, Math.min(nChillers, Math.ceil(chwRT / STAGE_RT)));
+
+      // ---- hero (cheap; dial + big-read + KPI strip change-gated) -------
+      effDial.set(effKWRT);
+      heroKW._num.textContent = fmt.int(chwKW);
+      hk.load._num.textContent = fmt.int(chwRT);
+      hk.temps._num.textContent = chws.toFixed(1) + ' / ' + chwr.toFixed(1);
+      hk.towers._num.textContent = M.facility.coolingTowers.length + '';
+      hk.pcw._num.textContent = fmt.int(pcwRT);
+      hk.stage._num.textContent = running + ' / ' + nChillers;
+      if (fc % 4 === 0) {
+        heroSub.textContent = (chwKW / 1000).toFixed(2) + ' MW · ' +
+          effKWRT.toFixed(3) + ' kW/RT · ' + running + '/' + nChillers + ' staged';
+      }
+
       // ---- sparklines (push + render EVERY frame) -----------------------
       sLoad.push(chwRT);  sLoad.render();
       sPower.push(chwKW / 1000); sPower.render();
 
-      // ---- KPIs (cheap, every frame) ------------------------------------
-      kLoad.set(fmt.int(chwRT));
-      kPower.set(fmt.n(chwKW / 1000, 2));
-      kEff.set(fmt.n(effKWRT, 3), { state: U.band(effKWRT, 0.62, 0.72, false) });
-      kTemps.set(chws.toFixed(1) + ' / ' + chwr.toFixed(1));
-
       if (fc % 8 !== 0) return;
 
-      // ---- staging: how many chillers run for the current load ----------
-      var nChillers = M.facility.chillers.length;
-      var running = Math.max(1, Math.min(nChillers, Math.ceil(chwRT / STAGE_RT)));
+      // ---- staging: per-chiller load for the current demand -------------
       var rtEach = chwRT / running;
 
       var meta = document.getElementById('chwmeta');
@@ -227,7 +273,7 @@
         var on = i < running;
         var rt = on ? rtEach + U.jitter('cr:' + c.id, tick, 22) : 0;
         var loadPct = on ? Math.min(100, rt / c.ratingRT * 100) : 0;
-        // ~0.6 kW/RT at the compressor (condenser/pumps carry the rest of the 3.2 plant figure)
+        // ~0.6 kW/RT at the compressor (condenser/pumps carry the rest of the plant figure)
         var kw = on ? rt * (0.60 + U.jitter('ck:' + c.id, tick, 0.02)) : 0;
         return {
           name: c.name,
@@ -269,12 +315,20 @@
   });
 
   // ---- helpers ------------------------------------------------------------
-  function kpiPanel(title, kpi) { return U.kpiPanel(title, kpi); }
   function statLine(k, v) { return U.statLine(k, v); }
-  function meterCell(pct) {
+
+  // status cell: state-coloured dot + label (Productive = good, Standby = muted)
+  function statusCell(state) {
+    var cls = state === 'Productive' ? 'good' : 'idle';
+    return '<span class="cw-dot ' + cls + '"></span><span class="cw-st">' + state + '</span>';
+  }
+
+  // inline .td-meter load bar (upgrade-kit class) + numeric readout
+  function tdMeterCell(pct, on) {
+    if (!on) return '<span class="cw-st">—</span>';
     var p = Math.max(0, Math.min(100, pct));
-    var cls = p >= 92 ? ' warn' : '';
-    return '<div class="meter' + cls + '" style="width:64px;display:inline-block;vertical-align:middle">' +
-      '<i style="width:' + p.toFixed(0) + '%"></i></div> ' + p.toFixed(0) + '%';
+    var hue = p >= 92 ? ' bad' : (p >= 80 ? ' warn' : ' good');
+    return '<span class="td-meter' + hue + '"><i style="width:' + p.toFixed(0) + '%"></i></span>' +
+      '<span class="cw-mval">' + p.toFixed(0) + '%</span>';
   }
 })(window.BAS);

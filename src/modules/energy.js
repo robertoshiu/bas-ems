@@ -1,34 +1,39 @@
 /* bas-ems — Energy Command Center (EMS centerpiece)
  * Classic script -> registers module 'energy'
  *
- * The densest, most authoritative EMS view: facility demand + wide trend,
- * demand detail vs peak, sub-metered load split, energy intensity & cost,
- * per-area process load, and power quality (switchgear / UPS). Every number
- * tracks the real frame.load / frame.kpis channels so it stays consistent with
- * every other module; sensor shimmer is deterministic via BAS.ui.jitter.
+ * The densest, most authoritative EMS view: a hero demand band (signature dial
+ * demand-vs-peak + specific-energy KPI strip), sub-metered load split with glow-
+ * dot meters and per-bar MW labels, energy intensity & cost, per-area process
+ * load with inline share meters, and power quality as a PF ring + voltage/freq/
+ * THD/UPS chip cluster. Every number tracks the real frame.load / frame.kpis
+ * channels so it stays consistent with every other module; sensor shimmer is
+ * deterministic via BAS.ui.jitter. Overhead ratio only — never "PUE".
  */
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master;
 
   // closure-scope widget refs
-  var bigRead, demandSpark, demandCanvas;
-  var ddProcess, ddFacility, ddOverhead, ddPeak, ddPct, ddPctMeter;
-  var subBars;
+  var demandDial, demandSpark, demandCanvas;
+  var readNum, readSub;                          // MW big-read + sub-line refs
+  var hk = {};                                  // hero KPI value spans
+  var ddProcess, ddFacility, ddOverhead, ddPeak;
+  var subRows;                                  // custom glow-dot bar rows
   var eiPerMove, eiSpecific, eiWpmh, eiCost, eiDaily, eiCarbon;
   var areaTbl;
-  var pfGauge, pqVolt, pqFreq, pqThd, pqUps, pqUpsMeter, pqBadge;
+  var pfRing, pqChips = {};                      // PF ring + chip refs
+  var pqUpsRing, pqBadge;
   var fc = 0;
 
-  // sub-metered load row order (label + load channel key)
+  // sub-metered load row order (label + load channel key + status hue)
   var SUB = [
-    { label: 'HVAC (MAU / AHU / FFU)', key: 'hvacKW' },
-    { label: 'Chilled Water Plant', key: 'chwKW' },
-    { label: 'Process Tools', key: 'processKW' },
-    { label: 'Ultrapure Water', key: 'upwKW' },
-    { label: 'Bulk Gas & CDA', key: 'gasKW' },
-    { label: 'Exhaust & Abatement', key: 'exhaustKW' },
-    { label: 'Other / House', key: 'otherKW' }
+    { label: 'HVAC (MAU / AHU / FFU)', key: 'hvacKW', hue: '' },
+    { label: 'Chilled Water Plant', key: 'chwKW', hue: '' },
+    { label: 'Process Tools', key: 'processKW', hue: 'accent' },
+    { label: 'Ultrapure Water', key: 'upwKW', hue: '' },
+    { label: 'Bulk Gas & CDA', key: 'gasKW', hue: '' },
+    { label: 'Exhaust & Abatement', key: 'exhaustKW', hue: '' },
+    { label: 'Other / House', key: 'otherKW', hue: '' }
   ];
 
   // total installed UPS kVA across modules (critical bus)
@@ -46,42 +51,97 @@
 
       var grid = el('div', 'grid');
 
-      // ---- (2a) Hero: Facility Demand --------------------------------------
-      var demandP = U.panel('Facility Demand', { cls: 'col-8', pill: 'LIVE' });
-      var hero = el('div'); hero.style.marginBottom = '8px';
-      var rlab = el('div', 'dim'); rlab.style.fontSize = 'var(--fs-1)';
-      rlab.style.letterSpacing = '.6px'; rlab.textContent = 'TOTAL DEMAND';
-      bigRead = el('div', 'big-read'); bigRead.textContent = '—';
-      var unit = el('span'); unit.style.fontSize = 'var(--fs-3)'; unit.style.color = 'var(--text-mut)';
-      unit.style.marginLeft = '8px'; unit.style.fontFamily = 'var(--mono)'; unit.textContent = 'MW';
-      bigRead.appendChild(unit);
-      hero.appendChild(rlab); hero.appendChild(bigRead);
-      demandP._body.appendChild(hero);
+      // ---- (1) HERO: Facility Demand band ---------------------------------
+      var heroP = U.panel('Facility Demand', { cls: 'col-12 hud', pill: 'LIVE' });
+      var hero = el('div', 'pg-hero ens-hero');
 
+      // signature: demand dial (% of peak) + MW big-read beside it
+      var sig = el('div', 'pg-hero-sig center ens-sig');
+      sig.appendChild(el('div', 'pg-hero-label', 'DEMAND / PEAK'));
+      demandDial = U.dial({
+        size: 176, label: 'of peak', unit: '%', max: 100, glow: true,
+        thresholds: { warn: 88, bad: 96 }, fmt: function (v) { return v.toFixed(1); }
+      });
+      sig.appendChild(demandDial.el);
+      // MW big-read under the dial
+      var read = el('div', 'ens-read');
+      var rNum = el('span', 'ens-read-n', '—');
+      var rUnit = el('span', 'ens-read-u', 'MW');
+      read.appendChild(rNum); read.appendChild(rUnit);
+      sig.appendChild(read);
+      var rsub = el('div', 'ens-read-sub'); rsub.textContent = '—';
+      sig.appendChild(rsub);
+      hero.appendChild(sig);
+      readNum = rNum; readSub = rsub;
+
+      // mid: wide demand trend sparkline
+      var trend = el('div', 'ens-trend');
+      trend.appendChild(el('div', 'ens-trend-lab', 'TOTAL DEMAND · 180s TREND'));
       demandCanvas = el('canvas', 'spark');
-      demandCanvas.style.height = '96px'; demandCanvas.style.width = '100%';
-      demandP._body.appendChild(demandCanvas);
-      grid.appendChild(demandP);
-      demandSpark = U.Sparkline(demandCanvas, { n: 240, height: 96, color: U.cssVar('--accent'), fill: true, slow: 9 }); // 3x slower than the global 3x
+      demandCanvas.style.height = '108px'; demandCanvas.style.width = '100%';
+      trend.appendChild(demandCanvas);
+      hero.appendChild(trend);
 
-      // ---- (2b) Demand Detail ----------------------------------------------
+      // right: KPI strip
+      var kpis = el('div', 'pg-hero-kpis ens-kpis');
+      [['cost', 'Cost Run-Rate', '/h', 'accent'],
+       ['perMove', 'Energy / Move', 'kWh', ''],
+       ['specific', 'Specific Energy', 'MWh/waf', ''],
+       ['pf', 'Power Factor', 'PF', 'good']
+      ].forEach(function (k) {
+        var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
+        box.appendChild(el('div', 'lab', k[1]));
+        var v = el('div', 'v');
+        var vn = el('span'); v.appendChild(vn);
+        var vu = el('span', 'u', k[2]); v.appendChild(vu);
+        v._num = vn;
+        box.appendChild(v);
+        kpis.appendChild(box);
+        hk[k[0]] = v;
+      });
+      hero.appendChild(kpis);
+
+      heroP._body.appendChild(hero);
+      grid.appendChild(heroP);
+
+      demandSpark = U.Sparkline(demandCanvas, { n: 240, height: 108, color: U.cssVar('--accent'), fill: true, slow: 9 });
+
+      // ---- (2) Demand Detail ----------------------------------------------
       var detP = U.panel('Demand Detail', { cls: 'col-4' });
       ddProcess = statLine(detP._body, 'Process Load');
       ddFacility = statLine(detP._body, 'Facility Load');
       ddOverhead = statLine(detP._body, 'Facility Overhead');
       ddPeak = statLine(detP._body, 'Peak Demand (loop)');
-      ddPct = statLine(detP._body, 'Demand vs Peak');
-      ddPctMeter = meterBar(detP._body, 'good');
       grid.appendChild(detP);
 
-      // ---- (3) Sub-metered Load --------------------------------------------
-      var subP = U.panel('Sub-metered Load', { cls: 'col-6', meta: 'by system', metaId: 'submeta' });
-      subBars = U.barList(SUB.map(function (s) { return { label: s.label }; }));
-      subP._body.appendChild(subBars.node);
+      // ---- (3) Sub-metered Load (glow-dot meters + mono MW labels) --------
+      var subP = U.panel('Sub-metered Load', { cls: 'col-8', meta: 'by system', metaId: 'submeta' });
+      var subWrap = el('div', 'ens-sub');
+      subRows = SUB.map(function (s) {
+        var row = el('div', 'ens-sub-row');
+        var head2 = el('div', 'ens-sub-head');
+        var lab = el('div', 'ens-sub-lab');
+        var dot = el('i', 'ens-dot' + (s.hue ? ' ' + s.hue : ''));
+        lab.appendChild(dot);
+        lab.appendChild(el('span', null, s.label));
+        head2.appendChild(lab);
+        var mw = el('div', 'ens-sub-mw');
+        var mwN = el('span', 'ens-sub-mwn', '—');
+        var mwP = el('span', 'ens-sub-mwp', '');
+        mw.appendChild(mwN); mw.appendChild(mwP);
+        head2.appendChild(mw);
+        row.appendChild(head2);
+        var meter = el('div', 'meter ens-sub-meter' + (s.hue === 'accent' ? ' good' : ''));
+        var fill = el('i'); fill.style.width = '0%'; meter.appendChild(fill);
+        row.appendChild(meter);
+        subWrap.appendChild(row);
+        return { key: s.key, mwN: mwN, mwP: mwP, dot: dot, fill: fill, lastP: -1 };
+      });
+      subP._body.appendChild(subWrap);
       grid.appendChild(subP);
 
-      // ---- (4) Energy Intensity & Cost -------------------------------------
-      var eiP = U.panel('Energy Intensity & Cost', { cls: 'col-6' });
+      // ---- (4) Energy Intensity & Cost ------------------------------------
+      var eiP = U.panel('Energy Intensity & Cost', { cls: 'col-5' });
       eiPerMove = statLine(eiP._body, 'Energy / Wafer-Move');
       eiSpecific = statLine(eiP._body, 'Specific Energy (fab)');
       eiWpmh = statLine(eiP._body, 'Wafer Moves / hr');
@@ -90,40 +150,66 @@
       eiCarbon = statLine(eiP._body, 'Carbon Rate');
       grid.appendChild(eiP);
 
-      // ---- (5) Process Load by Area ----------------------------------------
-      var areaP = U.panel('Process Load by Area', { cls: 'col-7', bodyCls: 'flush' });
+      // ---- (5) Power Quality (PF ring + chip cluster) ---------------------
+      var pqP = U.panel('Power Quality', { cls: 'col-7', meta: BUS_KV.toFixed(1) + ' kV bus', metaId: 'pqmeta' });
+      var pqWrap = el('div', 'ens-pq');
+
+      // left: PF ring + UPS ring
+      var ringCol = el('div', 'ens-pq-rings');
+      pfRing = U.ringGauge({
+        size: 138, label: 'power factor', unit: 'PF', min: 0.90, max: 1.00,
+        thresholds: { warn: 0.95, bad: 0.92, invert: true }, glow: true,
+        fmt: function (v) { return v.toFixed(3); }
+      });
+      ringCol.appendChild(pfRing.el);
+      pqUpsRing = U.ringGauge({
+        size: 122, label: 'ups load', unit: '%', min: 0, max: 100,
+        thresholds: { warn: 70, bad: 85 },
+        fmt: function (v) { return v.toFixed(0); }
+      });
+      ringCol.appendChild(pqUpsRing.el);
+      pqWrap.appendChild(ringCol);
+
+      // right: chip readouts (voltage / freq / THD / UPS kVA / harmonic)
+      var chipCol = el('div', 'ens-pq-chips');
+      [['volt', 'BUS VOLTAGE', ''], ['freq', 'FREQUENCY', ''],
+       ['thd', 'VOLTAGE THD', ''], ['ups', 'UPS DRAW (' + U.group(UPS_KVA) + ' kVA)', '']
+      ].forEach(function (c) {
+        var chip = el('div', 'chip ens-chip');
+        chip.appendChild(el('span', 'k', c[1]));
+        var v = el('span', 'v', '—');
+        chip.appendChild(v);
+        chipCol.appendChild(chip);
+        pqChips[c[0]] = { chip: chip, v: v };
+      });
+      // harmonic-compliance chip with state badge
+      var hrow = el('div', 'chip ens-chip ens-chip-badge');
+      hrow.appendChild(el('span', 'k', 'HARMONIC COMPLIANCE'));
+      var bspan = el('span', 'v');
+      pqBadge = U.stateBadge('Productive');
+      pqBadge.firstChild.nextSibling.textContent = 'IEEE 519 OK';
+      bspan.appendChild(pqBadge);
+      hrow.appendChild(bspan);
+      chipCol.appendChild(hrow);
+      pqWrap.appendChild(chipCol);
+
+      pqP._body.appendChild(pqWrap);
+      grid.appendChild(pqP);
+
+      // ---- (6) Process Load by Area (td-meter per row) --------------------
+      var areaP = U.panel('Process Load by Area', { cls: 'col-12', bodyCls: 'flush' });
       areaTbl = U.table([
         { label: 'Area', key: 'name', tdCls: 'name' },
         { label: 'Load', render: function (r) { return U.group(Math.round(r.kw)) + ' kW'; }, tdCls: 'num' },
         { label: '% Proc', render: function (r) { return r.pct.toFixed(1) + '%'; }, tdCls: 'num' },
-        { label: 'Share', render: function (r) { return shareBar(r.pct, r.max); }, tdCls: 'num' }
-      ], { maxH: '300px' });
+        { label: 'Share', render: function (r) {
+            var w = r.max > 0 ? Math.max(0, Math.min(100, r.pct / r.max * 100)) : 0;
+            var hue = w > 82 ? ' warn' : '';
+            return '<span class="td-meter' + hue + '"><i style="width:' + w.toFixed(0) + '%"></i></span>';
+          } }
+      ], { maxH: '260px' });
       areaP._body.appendChild(areaTbl.node);
       grid.appendChild(areaP);
-
-      // ---- (6) Power Quality -----------------------------------------------
-      var pqP = U.panel('Power Quality', { cls: 'col-5', meta: BUS_KV.toFixed(1) + ' kV bus', metaId: 'pqmeta' });
-      var gwrap = el('div'); gwrap.style.display = 'flex'; gwrap.style.justifyContent = 'center';
-      gwrap.style.marginBottom = '6px';
-      pfGauge = U.gauge({
-        label: 'Power Factor', unit: 'PF', min: 0.90, max: 1.00, size: 150,
-        thresholds: { warn: 0.95, bad: 0.92, invert: true }, fmt: function (v) { return v.toFixed(3); }
-      });
-      gwrap.appendChild(pfGauge.node);
-      pqP._body.appendChild(gwrap);
-
-      pqVolt = statLine(pqP._body, 'Bus Voltage');
-      pqFreq = statLine(pqP._body, 'Frequency');
-      pqThd = statLine(pqP._body, 'Voltage THD');
-      pqUps = statLine(pqP._body, 'UPS Load (' + U.group(UPS_KVA) + ' kVA)');
-      pqUpsMeter = meterBar(pqP._body, 'good');
-      var brow = el('div', 'stat-line'); brow.style.borderBottom = 'none';
-      brow.appendChild(el('span', 'k', 'Harmonic Compliance'));
-      var bspan = el('span', 'v'); pqBadge = U.stateBadge('Productive');
-      pqBadge.firstChild.nextSibling.textContent = 'IEEE 519 OK';
-      bspan.appendChild(pqBadge); brow.appendChild(bspan);
-      pqP._body.appendChild(brow);
-      grid.appendChild(pqP);
 
       root.appendChild(grid);
     },
@@ -132,22 +218,30 @@
       fc++;
       var L = frame.load, K = frame.kpis;
 
-      // ---- hero: total demand + wide trend (push + render every frame) -----
-      bigRead.firstChild.textContent = K.totalMW.toFixed(1);
+      // ---- hero signature: dial (% of peak) — every frame (change-gated) --
+      demandDial.set(K.demandPct);
+
+      // wide trend (push + render every frame)
       demandSpark.push(K.totalMW);
       demandSpark.render();
 
-      // ---- demand detail (cheap, every frame) ------------------------------
+      // ---- hero KPI strip + MW big-read (cheap text, every frame) ---------
+      hk.cost._num.textContent = U.fmt.money(K.costRate);
+      hk.perMove._num.textContent = K.energyPerMove.toFixed(1);
+      hk.specific._num.textContent = K.specificEnergy.toFixed(2);
+      var pf = 0.970 + U.jitter('pf', frame.tick, 0.006);
+      hk.pf._num.textContent = pf.toFixed(3);
+
+      // MW big-read + sub-line (peak / overhead) under the dial
+      setRead(K);
+
+      // ---- demand detail (cheap, every frame) -----------------------------
       ddProcess.textContent = K.processMW.toFixed(1) + ' MW';
       ddFacility.textContent = K.facilityMW.toFixed(1) + ' MW';
       ddOverhead.textContent = K.overheadRatio.toFixed(2) + ' x';
       ddPeak.textContent = K.demandPeakMW.toFixed(1) + ' MW';
-      ddPct.textContent = K.demandPct.toFixed(1) + ' %';
-      var pctState = U.band(K.demandPct, 88, 96, false);
-      ddPctMeter.fill.style.width = clamp(K.demandPct) + '%';
-      ddPctMeter.meter.className = 'meter ' + pctState;
 
-      // ---- energy intensity & cost (every frame; light) --------------------
+      // ---- energy intensity & cost (every frame; light) -------------------
       eiPerMove.textContent = K.energyPerMove.toFixed(1) + ' kWh';
       eiSpecific.textContent = K.specificEnergy.toFixed(2) + ' MWh/waf';
       eiWpmh.textContent = U.group(Math.round(K.wpmh));
@@ -155,37 +249,39 @@
       eiDaily.textContent = U.group(Math.round(K.avgMW * 24)) + ' MWh';
       eiCarbon.textContent = K.co2eRate.toFixed(2) + ' tCO₂e/h';
 
-      // ---- power quality (analog shimmer off frame.tick) -------------------
-      var pf = 0.970 + U.jitter('pf', frame.tick, 0.006);
-      pfGauge.set(pf);
-      pqVolt.textContent = (BUS_KV + U.jitter('busV', frame.tick, 0.04)).toFixed(2) + ' kV';
-      pqFreq.textContent = (60.00 + U.jitter('freq', frame.tick, 0.015)).toFixed(2) + ' Hz';
+      // ---- power quality: PF ring + UPS ring + chips ----------------------
+      pfRing.set(pf);
+      pqChips.volt.v.textContent = (BUS_KV + U.jitter('busV', frame.tick, 0.04)).toFixed(2) + ' kV';
+      pqChips.freq.v.textContent = (60.00 + U.jitter('freq', frame.tick, 0.015)).toFixed(2) + ' Hz';
       var thd = 2.4 + U.jitter('thd', frame.tick, 0.18);
-      pqThd.textContent = thd.toFixed(1) + ' %';
+      pqChips.thd.v.textContent = thd.toFixed(1) + ' %';
       // UPS critical bus tracks a fraction of process load (deterministic).
       var critKW = L.processKW * 0.10 + 320;            // critical + controls bus
       var upsKVA = critKW / 0.95;                        // ~0.95 pf at the modules
       var upsPct = clamp(upsKVA / UPS_KVA * 100);
-      pqUps.textContent = upsPct.toFixed(0) + ' % · ' + U.group(Math.round(upsKVA)) + ' kVA';
-      var upsState = U.band(upsPct, 70, 85, false);
-      pqUpsMeter.fill.style.width = upsPct + '%';
-      pqUpsMeter.meter.className = 'meter ' + upsState;
+      pqUpsRing.set(upsPct);
+      pqChips.ups.v.textContent = upsPct.toFixed(0) + ' % · ' + U.group(Math.round(upsKVA)) + ' kVA';
       var thdOk = thd < 5;
       setBadge(pqBadge, thdOk ? 'Productive' : 'Engineering', thdOk ? 'IEEE 519 OK' : 'THD HIGH');
 
       // ---- throttled rebuilds ---------------------------------------------
-      // sub-metered load: every 4 frames
+      // sub-metered load: every 4 frames (change-gated per row)
       if (fc % 4 === 0) {
         var total = L.totalKW || 1;
-        subBars.set(SUB.map(function (s) {
-          var kw = L[s.key];
+        for (var si = 0; si < subRows.length; si++) {
+          var r = subRows[si];
+          var kw = L[r.key] || 0;
           var pct = kw / total * 100;
-          return {
-            text: (kw / 1000).toFixed(1) + ' MW · ' + pct.toFixed(0) + '%',
-            pct: pct,
-            cls: s.key === 'processKW' ? 'good' : null
-          };
-        }));
+          var pctR = Math.round(pct * 10);
+          if (pctR !== r.lastP) {
+            r.lastP = pctR;
+            r.mwN.textContent = (kw / 1000).toFixed(2) + ' MW';
+            r.mwP.textContent = pct.toFixed(0) + '%';
+            r.fill.style.width = clamp(pct) + '%';
+            // glow-dot intensity scales with share
+            r.dot.style.opacity = (0.45 + Math.min(0.55, pct / 100 * 1.6)).toFixed(2);
+          }
+        }
       }
 
       // process load by area: every 8 frames
@@ -206,19 +302,14 @@
   });
 
   // ---- small DOM helpers -------------------------------------------------
+  var _lastMW = '', _lastSub = '';
+  function setRead(K) {
+    var mw = K.totalMW.toFixed(1);
+    if (mw !== _lastMW) { _lastMW = mw; readNum.textContent = mw; }
+    var sub = K.demandPeakMW.toFixed(1) + ' MW peak · ' + K.overheadRatio.toFixed(2) + '× overhead';
+    if (sub !== _lastSub) { _lastSub = sub; readSub.textContent = sub; }
+  }
   function statLine(parent, label) { return U.statRow(parent, label); }
-  function meterBar(parent, cls) {
-    var m = el('div', 'meter ' + (cls || ''));
-    m.style.margin = '-2px 0 8px';
-    var i = el('i'); i.style.width = '0%'; m.appendChild(i);
-    parent.appendChild(m);
-    return { meter: m, fill: i };
-  }
-  function shareBar(pct, maxPct) {
-    var w = maxPct > 0 ? Math.min(100, pct / maxPct * 100) : 0;
-    return '<div class="meter" style="width:64px;display:inline-block;vertical-align:middle">' +
-      '<i style="width:' + w.toFixed(0) + '%"></i></div>';
-  }
   function setBadge(badge, state, text) {
     badge.className = 'badge st-' + state.replace(/\s+/g, '');
     badge.firstChild.nextSibling.textContent = text;

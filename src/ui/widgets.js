@@ -202,5 +202,125 @@ window.BAS = window.BAS || {};
     return p;
   };
 
+  // ======================================================================
+  // === upgrade kit === large hero signatures (shared by page-hero band)
+  // ======================================================================
+
+  // ---- ringGauge: LARGE donut-arc gauge (120-180px) --------------------
+  // opts {size,thickness,color,label,unit,max,min,thresholds:{warn,bad,invert},
+  //       glow:true, fmt}. Returns {el, set(value[,label])} with change-gated
+  // writes (no DOM churn when the rounded value/colour is unchanged).
+  U.ringGauge = function (opts) {
+    opts = opts || {};
+    var size = opts.size || 150;
+    var thick = opts.thickness || Math.round(size * 0.11);
+    var min = opts.min || 0, max = opts.max == null ? 100 : opts.max;
+    var baseColor = opts.color || U.cssVar('--accent');
+    // near-full donut: 270deg sweep, gap at the bottom.
+    var A0 = -135, A1 = 135, span = A1 - A0;
+    var R = 50 - thick / 2 - 1;            // radius in the 0..100 viewBox
+    var node = el('div', 'ring-gauge' + (opts.glow ? ' glow' : ''));
+    node.style.width = size + 'px';
+    var s = U.svg('svg', { viewBox: '0 0 100 100', width: size, height: size });
+    s.setAttribute('role', 'meter');
+    s.setAttribute('aria-label', (opts.label || 'gauge') + (opts.unit ? ' (' + opts.unit + ')' : ''));
+    s.setAttribute('aria-valuemin', String(min));
+    s.setAttribute('aria-valuemax', String(max));
+    s.setAttribute('aria-valuenow', String(min));
+    s.appendChild(U.svg('path', { d: arcPath(50, 50, R, A0, A1), fill: 'none',
+      stroke: U.cssVar('--bg-3'), 'stroke-width': thick, 'stroke-linecap': 'round' }));
+    var valArc = U.svg('path', { 'class': 'rg-arc', d: arcPath(50, 50, R, A0, A0 + 0.1), fill: 'none',
+      stroke: baseColor, 'stroke-width': thick, 'stroke-linecap': 'round' });
+    s.appendChild(valArc);
+    var valT = U.svg('text', { 'class': 'rg-val', x: 50, y: 50, 'text-anchor': 'middle',
+      'dominant-baseline': 'middle', fill: U.cssVar('--text'), 'font-size': size >= 150 ? 19 : 17 });
+    var unitT = U.svg('text', { x: 50, y: 64, 'text-anchor': 'middle',
+      fill: U.cssVar('--text-mut'), 'font-size': 8 });
+    unitT.textContent = opts.unit || '';
+    var labT = U.svg('text', { x: 50, y: 86, 'text-anchor': 'middle',
+      fill: U.cssVar('--text-mut'), 'font-size': 7.5, 'letter-spacing': '.08em' });
+    labT.textContent = (opts.label || '').toUpperCase();
+    s.appendChild(valT); s.appendChild(unitT); s.appendChild(labT);
+    node.appendChild(s);
+    var lastTxt = null, lastFrac = -1, lastNow = min, lastStroke = baseColor;
+    return {
+      el: node,
+      set: function (v, label) {
+        var frac = Math.max(0, Math.min(1, (v - min) / (max - min)));
+        if (Math.abs(frac - lastFrac) > 0.002) {
+          lastFrac = frac;
+          valArc.setAttribute('d', arcPath(50, 50, R, A0, A0 + Math.max(0.1, frac * span)));
+        }
+        var txt = label != null ? label : (opts.fmt ? opts.fmt(v) : Math.round(v));
+        if (txt !== lastTxt) { lastTxt = txt; valT.textContent = txt; }
+        if (opts.thresholds) {
+          var st = U.band(v, opts.thresholds.warn, opts.thresholds.bad, opts.thresholds.invert);
+          var stroke = U.cssVar('--' + (st === 'good' ? 'good' : st));
+          if (stroke !== lastStroke) { lastStroke = stroke; valArc.setAttribute('stroke', stroke); }
+        }
+        var rounded = Math.round(Math.max(min, Math.min(max, v)));
+        if (rounded !== lastNow) { lastNow = rounded; s.setAttribute('aria-valuenow', String(rounded)); }
+      }
+    };
+  };
+
+  // ---- dial: half-circle "demand dial" (240deg sweep) hero signature ----
+  // Same opts contract as ringGauge; wider sweep, value read sits below the arc.
+  // Returns {el, set(v[,label])}.
+  U.dial = function (opts) {
+    opts = opts || {};
+    var size = opts.size || 170;
+    var thick = opts.thickness || Math.round(size * 0.085);
+    var min = opts.min || 0, max = opts.max == null ? 100 : opts.max;
+    var baseColor = opts.color || U.cssVar('--accent');
+    // 240deg sweep, symmetric, gap at bottom.
+    var A0 = -120, A1 = 120, span = A1 - A0;
+    var R = 50 - thick / 2 - 1;
+    var node = el('div', 'ring-gauge dial' + (opts.glow ? ' glow' : ''));
+    node.style.width = size + 'px';
+    // shorter viewBox height — the dial is wider than tall.
+    var s = U.svg('svg', { viewBox: '0 0 100 88', width: size, height: Math.round(size * 0.88) });
+    s.setAttribute('role', 'meter');
+    s.setAttribute('aria-label', (opts.label || 'dial') + (opts.unit ? ' (' + opts.unit + ')' : ''));
+    s.setAttribute('aria-valuemin', String(min));
+    s.setAttribute('aria-valuemax', String(max));
+    s.setAttribute('aria-valuenow', String(min));
+    s.appendChild(U.svg('path', { d: arcPath(50, 50, R, A0, A1), fill: 'none',
+      stroke: U.cssVar('--bg-3'), 'stroke-width': thick, 'stroke-linecap': 'round' }));
+    var valArc = U.svg('path', { 'class': 'rg-arc', d: arcPath(50, 50, R, A0, A0 + 0.1), fill: 'none',
+      stroke: baseColor, 'stroke-width': thick, 'stroke-linecap': 'round' });
+    s.appendChild(valArc);
+    var valT = U.svg('text', { 'class': 'rg-val', x: 50, y: 52, 'text-anchor': 'middle',
+      fill: U.cssVar('--text'), 'font-size': size >= 160 ? 22 : 18 });
+    var unitT = U.svg('text', { x: 50, y: 66, 'text-anchor': 'middle',
+      fill: U.cssVar('--text-mut'), 'font-size': 8 });
+    unitT.textContent = opts.unit || '';
+    var labT = U.svg('text', { x: 50, y: 82, 'text-anchor': 'middle',
+      fill: U.cssVar('--text-mut'), 'font-size': 7.5, 'letter-spacing': '.08em' });
+    labT.textContent = (opts.label || '').toUpperCase();
+    s.appendChild(valT); s.appendChild(unitT); s.appendChild(labT);
+    node.appendChild(s);
+    var lastTxt = null, lastFrac = -1, lastNow = min, lastStroke = baseColor;
+    return {
+      el: node,
+      set: function (v, label) {
+        var frac = Math.max(0, Math.min(1, (v - min) / (max - min)));
+        if (Math.abs(frac - lastFrac) > 0.002) {
+          lastFrac = frac;
+          valArc.setAttribute('d', arcPath(50, 50, R, A0, A0 + Math.max(0.1, frac * span)));
+        }
+        var txt = label != null ? label : (opts.fmt ? opts.fmt(v) : Math.round(v));
+        if (txt !== lastTxt) { lastTxt = txt; valT.textContent = txt; }
+        if (opts.thresholds) {
+          var st = U.band(v, opts.thresholds.warn, opts.thresholds.bad, opts.thresholds.invert);
+          var stroke = U.cssVar('--' + (st === 'good' ? 'good' : st));
+          if (stroke !== lastStroke) { lastStroke = stroke; valArc.setAttribute('stroke', stroke); }
+        }
+        var rounded = Math.round(Math.max(min, Math.min(max, v)));
+        if (rounded !== lastNow) { lastNow = rounded; s.setAttribute('aria-valuenow', String(rounded)); }
+      }
+    };
+  };
+
   U.arcPath = arcPath; U.polar = polar;
 })(window.BAS);
