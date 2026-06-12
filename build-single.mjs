@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from 'fs';
 let html = readFileSync('index.html', 'utf8');
 
 html = html.replace(/<link rel="stylesheet" href="([^"]+)"\s*\/>/g, function (_, href) {
+  if (/^https?:\/\//.test(href)) return '<link rel="stylesheet" href="' + href + '" />'; // keep external links
   return '<style>\n/* ' + href + ' */\n' + readFileSync(href, 'utf8') + '\n</style>';
 });
 

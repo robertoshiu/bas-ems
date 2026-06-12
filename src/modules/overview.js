@@ -233,7 +233,7 @@
   // throttled. Top faces lighter, side faces darker for depth.
   // ======================================================================
   function buildIso(parent) {
-    var VW = 800, VH = 520;
+    var VW = 800, VH = 585;
     var svg = U.svg('svg', { viewBox: '0 0 ' + VW + ' ' + VH, 'class': 'cc-iso' });
     svg.setAttribute('aria-label', 'Isometric fab cutaway: roof systems, fab level, sub-fab utilities');
 
@@ -332,7 +332,7 @@
     var COLS = 4, ROWS = 2, hwT = 28, hdT = 28;
     for (var ai = 0; ai < AREAS.length; ai++) {
       var col = ai % COLS, rowI = Math.floor(ai / COLS);
-      var wx = -120 + col * 80 + 40;
+      var wx = -120 + col * 80;
       var wy = -90 + rowI * 90 + 45;
       var a = AREAS[ai];
       var tile = U.svg('path', {
@@ -390,7 +390,7 @@
 
       // risers: animate dash-offset every 4th frame (skip under reduced motion)
       if (!REDUCED && frame.tick % 4 === 0) {
-        riserOffset = (riserOffset - 2) % 16;
+        riserOffset = (riserOffset - 2) % 12;
         var off = riserOffset.toFixed(0);
         for (var ri = 0; ri < risers.length; ri++) risers[ri].setAttribute('stroke-dashoffset', off);
       }
