@@ -12,6 +12,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // closure-scope widget refs
   var demandDial, demandSpark, demandCanvas;
@@ -44,9 +45,9 @@
     id: 'energy', title: 'Energy Center', group: 'EMS', order: 1, icon: 'energy',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Energy Command Center</h1>' +
-        '<span class="crumb">FAB-1 · Demand · Sub-metering · Power Quality</span>' +
-        '<span class="right">all totals from live facility metering &#8595;</span>';
+      head.innerHTML = '<h1>' + T('Energy Command Center') + '</h1>' +
+        '<span class="crumb">FAB-1 · ' + T('Demand · Sub-metering · Power Quality') + '</span>' +
+        '<span class="right">' + T('all totals from live facility metering') + ' &#8595;</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -57,7 +58,7 @@
 
       // signature: demand dial (% of peak) + MW big-read beside it
       var sig = el('div', 'pg-hero-sig center ens-sig');
-      sig.appendChild(el('div', 'pg-hero-label', 'DEMAND / PEAK'));
+      sig.appendChild(el('div', 'pg-hero-label', T('DEMAND / PEAK')));
       demandDial = U.dial({
         size: 176, label: 'of peak', unit: '%', max: 100, glow: true,
         thresholds: { warn: 88, bad: 96 }, fmt: function (v) { return v.toFixed(1); }
@@ -76,7 +77,7 @@
 
       // mid: wide demand trend sparkline
       var trend = el('div', 'ens-trend');
-      trend.appendChild(el('div', 'ens-trend-lab', 'TOTAL DEMAND · 180s TREND'));
+      trend.appendChild(el('div', 'ens-trend-lab', T('TOTAL DEMAND · 180s TREND')));
       demandCanvas = el('canvas', 'spark');
       demandCanvas.style.height = '108px'; demandCanvas.style.width = '100%';
       trend.appendChild(demandCanvas);
@@ -90,7 +91,7 @@
        ['pf', 'Power Factor', 'PF', 'good']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         var vu = el('span', 'u', k[2]); v.appendChild(vu);
@@ -108,10 +109,10 @@
 
       // ---- (2) Demand Detail ----------------------------------------------
       var detP = U.panel('Demand Detail', { cls: 'col-4' });
-      ddProcess = statLine(detP._body, 'Process Load');
-      ddFacility = statLine(detP._body, 'Facility Load');
-      ddOverhead = statLine(detP._body, 'Facility Overhead');
-      ddPeak = statLine(detP._body, 'Peak Demand (loop)');
+      ddProcess = statLine(detP._body, T('Process Load'));
+      ddFacility = statLine(detP._body, T('Facility Load'));
+      ddOverhead = statLine(detP._body, T('Facility Overhead'));
+      ddPeak = statLine(detP._body, T('Peak Demand (loop)'));
       grid.appendChild(detP);
 
       // ---- (3) Sub-metered Load (glow-dot meters + mono MW labels) --------
@@ -123,7 +124,7 @@
         var lab = el('div', 'ens-sub-lab');
         var dot = el('i', 'ens-dot' + (s.hue ? ' ' + s.hue : ''));
         lab.appendChild(dot);
-        lab.appendChild(el('span', null, s.label));
+        lab.appendChild(el('span', null, T(s.label)));
         head2.appendChild(lab);
         var mw = el('div', 'ens-sub-mw');
         var mwN = el('span', 'ens-sub-mwn', '—');
@@ -142,12 +143,12 @@
 
       // ---- (4) Energy Intensity & Cost ------------------------------------
       var eiP = U.panel('Energy Intensity & Cost', { cls: 'col-5' });
-      eiPerMove = statLine(eiP._body, 'Energy / Wafer-Move');
-      eiSpecific = statLine(eiP._body, 'Specific Energy (fab)');
-      eiWpmh = statLine(eiP._body, 'Wafer Moves / hr');
-      eiCost = statLine(eiP._body, 'Cost Run-Rate');
-      eiDaily = statLine(eiP._body, 'Est. Daily Energy');
-      eiCarbon = statLine(eiP._body, 'Carbon Rate');
+      eiPerMove = statLine(eiP._body, T('Energy / Wafer-Move'));
+      eiSpecific = statLine(eiP._body, T('Specific Energy (fab)'));
+      eiWpmh = statLine(eiP._body, T('Wafer Moves / hr'));
+      eiCost = statLine(eiP._body, T('Cost Run-Rate'));
+      eiDaily = statLine(eiP._body, T('Est. Daily Energy'));
+      eiCarbon = statLine(eiP._body, T('Carbon Rate'));
       grid.appendChild(eiP);
 
       // ---- (5) Power Quality (PF ring + chip cluster) ---------------------
@@ -173,10 +174,10 @@
       // right: chip readouts (voltage / freq / THD / UPS kVA / harmonic)
       var chipCol = el('div', 'ens-pq-chips');
       [['volt', 'BUS VOLTAGE', ''], ['freq', 'FREQUENCY', ''],
-       ['thd', 'VOLTAGE THD', ''], ['ups', 'UPS DRAW (' + U.group(UPS_KVA) + ' kVA)', '']
+       ['thd', 'VOLTAGE THD', ''], ['ups', T('UPS DRAW') + ' (' + U.group(UPS_KVA) + ' kVA)', '']
       ].forEach(function (c) {
         var chip = el('div', 'chip ens-chip');
-        chip.appendChild(el('span', 'k', c[1]));
+        chip.appendChild(el('span', 'k', c[0] === 'ups' ? c[1] : T(c[1])));
         var v = el('span', 'v', '—');
         chip.appendChild(v);
         chipCol.appendChild(chip);
@@ -184,7 +185,7 @@
       });
       // harmonic-compliance chip with state badge
       var hrow = el('div', 'chip ens-chip ens-chip-badge');
-      hrow.appendChild(el('span', 'k', 'HARMONIC COMPLIANCE'));
+      hrow.appendChild(el('span', 'k', T('HARMONIC COMPLIANCE')));
       var bspan = el('span', 'v');
       pqBadge = U.stateBadge('Productive');
       pqBadge.firstChild.nextSibling.textContent = 'IEEE 519 OK';
@@ -291,7 +292,7 @@
         procTotal = procTotal || 1;
         var rows = M.areas.map(function (a) {
           var kw = L.areaKW[a.id] || 0;
-          return { name: a.name, kw: kw, pct: kw / procTotal * 100 };
+          return { name: T(a.name), kw: kw, pct: kw / procTotal * 100 };
         });
         rows.sort(function (x, y) { return y.kw - x.kw; });
         var maxPct = rows.length ? rows[0].pct : 1;
@@ -306,7 +307,7 @@
   function setRead(K) {
     var mw = K.totalMW.toFixed(1);
     if (mw !== _lastMW) { _lastMW = mw; readNum.textContent = mw; }
-    var sub = K.demandPeakMW.toFixed(1) + ' MW peak · ' + K.overheadRatio.toFixed(2) + '× overhead';
+    var sub = K.demandPeakMW.toFixed(1) + ' MW ' + T('peak') + ' · ' + K.overheadRatio.toFixed(2) + '× ' + T('overhead');
     if (sub !== _lastSub) { _lastSub = sub; readSub.textContent = sub; }
   }
   function statLine(parent, label) { return U.statRow(parent, label); }

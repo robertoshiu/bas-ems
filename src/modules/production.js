@@ -16,6 +16,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master;
+  var t = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // SEMI E10 six states, in fixed display order, with their token colours.
   var E10 = [
@@ -36,8 +37,8 @@
     id: 'production', title: 'Production Floor', group: 'Operations', order: 1, icon: 'flow',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Production Floor</h1><span class="crumb">FAB-1 · Live SECS/GEM · MES · AMHS</span>' +
-        '<span class="right">production activity drives facility load &#8595;</span>';
+      head.innerHTML = '<h1>' + t('Production Floor') + '</h1><span class="crumb">FAB-1 · ' + t('Live SECS/GEM · MES · AMHS') + '</span>' +
+        '<span class="right">' + t('production activity drives facility load') + ' &#8595;</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -94,7 +95,7 @@
       var stWrap = el('div', 'prod-states');
       M.areas.forEach(function (a) {
         var row = el('div', 'prod-state-row');
-        row.appendChild(el('div', 'prod-state-nm', a.name));
+        row.appendChild(el('div', 'prod-state-nm', t(a.name)));
         var track = el('div', 'prod-state-track');
         var segs = [];
         E10.forEach(function (s) {
@@ -116,7 +117,7 @@
       var cwrap = el('div', 'prod-counters');
       [['lots', 'Lots / hr'], ['moves', 'Wafer moves / hr'], ['jobs', 'Active jobs'], ['alarms', 'Active alarms']].forEach(function (c) {
         var box = el('div', 'prod-counter');
-        box.appendChild(el('div', 'lab', c[1]));
+        box.appendChild(el('div', 'lab', t(c[1])));
         var v = el('div', 'v', '—');
         box.appendChild(v);
         cwrap.appendChild(box);
@@ -180,7 +181,7 @@
           var akw = L.areaKW[M.areas[hi].id] || 0;
           if (akw > hotKW) { hotKW = akw; hottest = M.areas[hi].name; }
         }
-        setText(ovHot, hottest + '  ' + (hotKW >= 1000 ? (hotKW / 1000).toFixed(1) + 'k' : Math.round(hotKW)) + ' kW');
+        setText(ovHot, t(hottest) + '  ' + (hotKW >= 1000 ? (hotKW / 1000).toFixed(1) + 'k' : Math.round(hotKW)) + ' kW');
 
         // active jobs table
         var jobs = frame.model.activeJobsAt(frame.t).slice(0, 14);
@@ -223,7 +224,7 @@
   // ---- helpers -----------------------------------------------------------
   function mkOvChip(parent, label, tone) {
     var chip = el('div', 'prod-ov-chip' + (tone ? ' ' + tone : ''));
-    chip.appendChild(el('div', 'k', label));
+    chip.appendChild(el('div', 'k', t(label)));
     var v = el('div', 'v', '—');
     chip.appendChild(v);
     parent.appendChild(chip);

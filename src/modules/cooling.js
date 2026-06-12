@@ -17,6 +17,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, fmt = U.fmt, M = BAS.master;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   var effDial;                                 // hero signature: plant efficiency kW/RT
   var heroKW, heroSub;                         // hero big-read plant kW + sub-line
@@ -37,8 +38,8 @@
 
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Process &amp; Chilled Water</h1>' +
-        '<span class="crumb">FAB-1 · CHW Plant · PCW Loops · Cooling Towers</span>';
+      head.innerHTML = '<h1>' + T('Process & Chilled Water') + '</h1>' +
+        '<span class="crumb">FAB-1 · ' + T('CHW Plant · PCW Loops · Cooling Towers') + '</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -51,7 +52,7 @@
       var hero = el('div', 'pg-hero cw-hero');
 
       var sig = el('div', 'pg-hero-sig center');
-      sig.appendChild(el('div', 'pg-hero-label', 'PLANT EFFICIENCY'));
+      sig.appendChild(el('div', 'pg-hero-label', T('PLANT EFFICIENCY')));
       effDial = U.dial({
         size: 168, label: 'kW / RT', unit: 'kW/RT', min: 0, max: 1.0, glow: true,
         fmt: function (v) { return v.toFixed(3); },
@@ -77,7 +78,7 @@
        ['stage', 'Chillers Staged', '', '']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         if (k[2]) v.appendChild(el('span', 'u', k[2]));
@@ -118,7 +119,7 @@
           // CHW Header (centre-left)
           { id: 'CHW-HDR', label: 'CHW Hdr',  x: 168, y: 68,  channel: 'chwRT' },
           // Process Load (centre)
-          { id: 'PROC',    label: 'Proc Load', x: 270, y: 68,  channel: 'pcwRT' },
+          { id: 'PROC',    label: T('Proc Load'), x: 270, y: 68,  channel: 'pcwRT' },
           // Cooling Towers (right column)
           { id: 'CT-01',   label: 'CT-01',    x: 370, y: 10,  channel: 'chwRT' },
           { id: 'CT-02',   label: 'CT-02',    x: 370, y: 68,  channel: 'chwRT' },
@@ -163,7 +164,7 @@
 
       // PCW loops
       var pcwHd = el('div', 'dim cw-subhd');
-      pcwHd.textContent = 'Process Cooling Water Loops  ·  20 °C Setpoint';
+      pcwHd.textContent = T('Process Cooling Water Loops  ·  20 °C Setpoint');
       leftP._body.appendChild(pcwHd);
       pcwTbl = U.table([
         { label: 'Loop', key: 'name', tdCls: 'name' },
@@ -177,7 +178,7 @@
 
       // Cooling towers
       var ctHd = el('div', 'dim cw-subhd');
-      ctHd.textContent = 'Cooling Towers  ·  Condenser-Water Heat Rejection';
+      ctHd.textContent = T('Cooling Towers  ·  Condenser-Water Heat Rejection');
       leftP._body.appendChild(ctHd);
       ctTbl = U.table([
         { label: 'Tower', key: 'name', tdCls: 'name' },
@@ -191,15 +192,15 @@
       grid.appendChild(leftP);
 
       // ---- trends (col-4) ----------------------------------------------
-      var rightP = U.panel('Plant Trends', { cls: 'col-4', meta: '180 s loop', metaId: 'trendmeta' });
+      var rightP = U.panel('Plant Trends', { cls: 'col-4', meta: '180 s ' + T('loop'), metaId: 'trendmeta' });
 
-      var t1 = el('div', 'dim'); t1.textContent = 'Cooling Load — RT'; t1.style.fontSize = 'var(--fs-1)';
+      var t1 = el('div', 'dim'); t1.textContent = T('Cooling Load — RT'); t1.style.fontSize = 'var(--fs-1)';
       rightP._body.appendChild(t1);
       var c1 = el('canvas', 'spark'); c1.style.height = '92px';
       rightP._body.appendChild(c1);
       sLoad = U.Sparkline(c1, { color: U.cssVar('--accent'), height: 92 });
 
-      var t2 = el('div', 'dim'); t2.textContent = 'Plant Power — MW'; t2.style.fontSize = 'var(--fs-1)';
+      var t2 = el('div', 'dim'); t2.textContent = T('Plant Power — MW'); t2.style.fontSize = 'var(--fs-1)';
       t2.style.marginTop = '14px';
       rightP._body.appendChild(t2);
       var c2 = el('canvas', 'spark'); c2.style.height = '92px';
@@ -208,10 +209,10 @@
 
       // quick plant facts
       var facts = el('div'); facts.style.marginTop = '14px';
-      facts.appendChild(statLine('Design Capacity', DESIGN_RT.toLocaleString() + ' RT'));
-      facts.appendChild(statLine('CHW Setpoint', CHWS_SET.toFixed(1) + ' / ' + CHWR_SET.toFixed(1) + ' °C'));
-      facts.appendChild(statLine('Distribution', M.facility.chwPumps.length + ' CHW pumps · VPF'));
-      facts.appendChild(statLine('Condenser Water', M.facility.coolingTowers.length + ' towers'));
+      facts.appendChild(statLine(T('Design Capacity'), DESIGN_RT.toLocaleString() + ' RT'));
+      facts.appendChild(statLine(T('CHW Setpoint'), CHWS_SET.toFixed(1) + ' / ' + CHWR_SET.toFixed(1) + ' °C'));
+      facts.appendChild(statLine(T('Distribution'), M.facility.chwPumps.length + ' ' + T('CHW pumps · VPF')));
+      facts.appendChild(statLine(T('Condenser Water'), M.facility.coolingTowers.length + ' ' + T('towers')));
       rightP._body.appendChild(facts);
 
       grid.appendChild(rightP);
@@ -254,7 +255,7 @@
       hk.stage._num.textContent = running + ' / ' + nChillers;
       if (fc % 4 === 0) {
         heroSub.textContent = (chwKW / 1000).toFixed(2) + ' MW · ' +
-          effKWRT.toFixed(3) + ' kW/RT · ' + running + '/' + nChillers + ' staged';
+          effKWRT.toFixed(3) + ' kW/RT · ' + running + '/' + nChillers + ' ' + T('staged');
       }
 
       // ---- sparklines (push + render EVERY frame) -----------------------
@@ -267,7 +268,7 @@
       var rtEach = chwRT / running;
 
       var meta = document.getElementById('chwmeta');
-      if (meta) meta.textContent = running + ' / ' + nChillers + ' staged · ' + fmt.int(chwRT) + ' RT';
+      if (meta) meta.textContent = running + ' / ' + nChillers + ' ' + T('staged') + ' · ' + fmt.int(chwRT) + ' RT';
 
       chillerTbl.set(M.facility.chillers.map(function (c, i) {
         var on = i < running;
@@ -276,7 +277,7 @@
         // ~0.6 kW/RT at the compressor (condenser/pumps carry the rest of the plant figure)
         var kw = on ? rt * (0.60 + U.jitter('ck:' + c.id, tick, 0.02)) : 0;
         return {
-          name: c.name,
+          name: T(c.name),
           on: on,
           state: on ? 'Productive' : 'Standby',
           loadPct: loadPct,
@@ -296,7 +297,7 @@
         var supply = (p.setpointC || PCW_SET) + U.jitter('ps:' + p.id, tick, 0.12);
         // m3/h from tons & deltaT: Q[kW]=RT*3.517; flow = Q/(1.163*dt)
         var flow = (rt * 3.517) / (1.163 * dt);
-        return { name: p.name, supply: supply, ret: supply + dt, dt: dt, flow: flow, rt: rt };
+        return { name: T(p.name), supply: supply, ret: supply + dt, dt: dt, flow: flow, rt: rt };
       }));
 
       // ---- cooling towers ----------------------------------------------
@@ -304,7 +305,7 @@
         // fan VFD tracks heat-rejection demand (chwRT) with per-tower shimmer
         var vfd = Math.max(35, Math.min(100, 55 + (loadFrac - 1) * 70 + U.jitter('cv:' + t.id, tick, 4)));
         return {
-          name: t.name,
+          name: T(t.name),
           cells: t.cells,
           basin: 24 + (loadFrac - 1) * 1.5 + U.jitter('cb:' + t.id, tick, 0.25),  // ~24 °C basin
           range: 4.5 + (loadFrac - 1) * 1.2 + U.jitter('cg:' + t.id, tick, 0.3),

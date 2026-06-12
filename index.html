@@ -17,6 +17,9 @@
 <body>
 <div id="app"></div>
 
+<!-- i18n (must load FIRST: no deps; sets BAS.i18n + <html lang> before engine/ui/modules) -->
+<script src="src/i18n.js"></script>
+
 <!-- engine (order matters: prng -> clock -> master-data -> events -> load-model -> sim) -->
 <script src="src/engine/prng.js"></script>
 <script src="src/engine/clock.js"></script>

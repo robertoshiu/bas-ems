@@ -14,6 +14,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
   var REDUCED = (typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -44,9 +45,9 @@
     id: 'overview', title: 'Command Center', group: 'Operations', order: 0, icon: 'hub',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Command Center</h1>' +
-        '<span class="crumb">FAB-1 · Facility demand · Fab cutaway · Energy flow</span>' +
-        '<span class="right">live mission overview &#8595;</span>';
+      head.innerHTML = '<h1>' + T('Command Center') + '</h1>' +
+        '<span class="crumb">FAB-1 · ' + T('Facility demand · Fab cutaway · Energy flow') + '</span>' +
+        '<span class="right">' + T('live mission overview') + ' &#8595;</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -56,7 +57,7 @@
       var hero = el('div', 'cc-hero');
 
       var main = el('div', 'cc-hero-main');
-      main.appendChild(el('div', 'cc-hero-label', 'FACILITY DEMAND'));
+      main.appendChild(el('div', 'cc-hero-label', T('FACILITY DEMAND')));
       heroVal = el('div', 'cc-hero-val');
       var num = el('span'); heroVal.appendChild(num);
       var u = el('span', 'u', 'MW'); heroVal.appendChild(u);
@@ -73,7 +74,7 @@
        ['co2', 'CO₂e', 't/h', ''], ['oee', 'Fleet OEE', '%', ''], ['wpmh', 'Wafer Moves', '/h', '']
       ].forEach(function (k) {
         var box = el('div', 'cc-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         var vu = el('span', 'u', k[2]); v.appendChild(vu);
@@ -106,7 +107,7 @@
       for (var ai = 0; ai < AREAS.length; ai++) {
         var a = AREAS[ai];
         var row = el('div', 'cc-area-row');
-        row.appendChild(el('div', 'nm', a.name));
+        row.appendChild(el('div', 'nm', T(a.name)));
         var bar = el('div', 'bar'); var fill = el('i'); fill.style.width = '0%'; bar.appendChild(fill);
         row.appendChild(bar);
         var rt = el('div', 'rt');
@@ -127,7 +128,7 @@
         var box = el('div', 'cc-sev ' + s[0]);
         var n = el('div', 'n', '0');
         box.appendChild(n);
-        box.appendChild(el('div', 'l', s[1]));
+        box.appendChild(el('div', 'l', T(s[1])));
         sevWrap.appendChild(box);
         sevN[s[0]] = n;
       });
@@ -135,7 +136,7 @@
 
       var evtWrap = el('div', 'cc-pulse-evt');
       var lab = el('div', 'lab');
-      lab.innerHTML = '<span>EVENT RATE</span><b id="cc-evtrate">0 evt/s</b>';
+      lab.innerHTML = '<span>' + T('EVENT RATE') + '</span><b id="cc-evtrate">0 evt/s</b>';
       evtRateEl = lab.querySelector('#cc-evtrate');
       evtWrap.appendChild(lab);
       var evtCanvas = el('canvas', 'spark');
@@ -160,7 +161,7 @@
       heroVal._num.textContent = mw.toFixed(2);
       var demandPct = K.demandPct;
       heroFill.style.width = Math.max(2, Math.min(100, demandPct)).toFixed(1) + '%';
-      heroSub.textContent = K.demandPeakMW.toFixed(2) + ' MW peak · ' + K.overheadRatio.toFixed(2) + '× overhead';
+      heroSub.textContent = K.demandPeakMW.toFixed(2) + ' MW ' + T('peak') + ' · ' + K.overheadRatio.toFixed(2) + '× ' + T('overhead');
 
       hk.demand._num.textContent = demandPct.toFixed(1);
       hk.renew._num.textContent = K.renewablePct.toFixed(1);
@@ -276,7 +277,7 @@
         x: level.ox - 152, y: level.oy - 4, 'text-anchor': 'start',
         'font-size': 9, fill: 'var(--text-mut)', 'letter-spacing': '0.12em'
       });
-      t.textContent = label;
+      t.textContent = T(label);
       svg.appendChild(t);
     }
     slab(ROOF, 'ROOF');
@@ -371,7 +372,7 @@
       svg.appendChild(glow);
       var nameT = U.svg('text', { x: top[0].toFixed(1), y: (top[1] - 2).toFixed(1),
         'text-anchor': 'middle', 'font-size': 8, fill: 'var(--text-mut)', 'letter-spacing': '0.05em' });
-      nameT.textContent = s.label;
+      nameT.textContent = T(s.label);
       svg.appendChild(nameT);
       var valT = U.svg('text', { x: top[0].toFixed(1), y: (top[1] + 8).toFixed(1),
         'text-anchor': 'middle', 'font-size': 8.5, fill: 'var(--accent)', 'font-family': 'var(--mono)' });
@@ -480,7 +481,7 @@
       var p = iso(ox, oy, cx, cy, z);
       var t = U.svg('text', { x: p[0].toFixed(1), y: p[1].toFixed(1), 'text-anchor': 'middle',
         'font-size': 8, fill: 'var(--text-mut)', 'letter-spacing': '0.05em' });
-      t.textContent = txt;
+      t.textContent = T(txt);
       svgEl.appendChild(t);
     }
   }
@@ -663,13 +664,13 @@
       ctx.textAlign = 'left';
       ctx.font = '8px ' + U.cssVar('--mono');
       ctx.fillStyle = U.cssVar('--accent');
-      ctx.fillText('GRID', t.srcX, t.gridY - 8);
+      ctx.fillText(T('GRID'), t.srcX, t.gridY - 8);
       ctx.fillStyle = U.cssVar('--good');
-      ctx.fillText('RENEWABLE', t.srcX, t.renY + 14);
+      ctx.fillText(T('RENEWABLE'), t.srcX, t.renY + 14);
       // total node label
       ctx.textAlign = 'center';
       ctx.fillStyle = U.cssVar('--text-dim');
-      ctx.fillText('TOTAL', t.totX, t.totTop - 6);
+      ctx.fillText(T('TOTAL'), t.totX, t.totTop - 6);
       ctx.fillStyle = U.cssVar('--accent'); ctx.font = '10px ' + U.cssVar('--mono');
       ctx.fillText(K.totalMW.toFixed(1) + ' MW', t.totX, t.totBot + 14);
       // sink labels + values
@@ -677,7 +678,7 @@
       for (var ls = 0; ls < NS; ls++) {
         var sk2 = SINKS[ls];
         ctx.fillStyle = U.cssVar('--text-dim');
-        ctx.fillText(sk2.label, t.sinkX, sk2._y - 4);
+        ctx.fillText(T(sk2.label), t.sinkX, sk2._y - 4);
         ctx.fillStyle = U.cssVar('--accent');
         ctx.fillText((sk2._kw / 1000).toFixed(2) + ' MW', t.sinkX, sk2._y + 7);
       }

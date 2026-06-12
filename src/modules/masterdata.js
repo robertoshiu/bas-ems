@@ -15,6 +15,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // ---- closure refs ----------------------------------------------------
   var ptTbl, ptMeta, equipTbl, treeWrap;
@@ -75,9 +76,9 @@
 
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Master Data &amp; Asset Registry</h1>' +
-        '<span class="crumb">FAB-1 · Asset Hierarchy · Point/Tag Registry</span>' +
-        '<span class="right">' + U.group(estPoints) + ' engineered points</span>';
+      head.innerHTML = '<h1>' + T('Master Data & Asset Registry') + '</h1>' +
+        '<span class="crumb">FAB-1 · ' + T('Asset Hierarchy · Point/Tag Registry') + '</span>' +
+        '<span class="right">' + U.group(estPoints) + ' ' + T('engineered points') + '</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -87,12 +88,12 @@
       var hero = el('div', 'pg-hero');
 
       var sig = el('div', 'pg-hero-sig center');
-      sig.appendChild(el('div', 'pg-hero-label', 'PROCESS TOOLS REGISTERED'));
+      sig.appendChild(el('div', 'pg-hero-label', T('PROCESS TOOLS REGISTERED')));
       var read = el('div', 'pg-hero-read');
       var rn = el('span'); rn.textContent = U.group(nTools); read.appendChild(rn);
       read.appendChild(el('span', 'u', 'eqp'));
       sig.appendChild(read);
-      sig.appendChild(el('div', 'pg-hero-sub', U.group(nAssets) + ' facility assets · ' + nAreas + ' process areas'));
+      sig.appendChild(el('div', 'pg-hero-sub', U.group(nAssets) + ' ' + T('facility assets') + ' · ' + nAreas + ' ' + T('process areas')));
       hero.appendChild(sig);
 
       var kpis = el('div', 'pg-hero-kpis');
@@ -103,7 +104,7 @@
         ['uptime', 'E10 Fleet Uptime', '%', 'good']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         if (k[2]) v.appendChild(el('span', 'u', k[2]));
@@ -210,7 +211,7 @@
       if (selPoints && fc % 8 === 0) {
         ptTbl.set(selPoints.map(function (pt) {
           return {
-            tag: pt.tag, desc: pt.desc, unit: pt.unit || '', bus: pt.bus, addr: pt.addr,
+            tag: pt.tag, desc: T(pt.desc), unit: pt.unit || '', bus: pt.bus, addr: pt.addr,
             value: liveValue(pt, frame)
           };
         }));
@@ -261,7 +262,7 @@
           var pct = Math.max(0, Math.min(100, t.baseKW / max * 100));
           var mc = pct >= 85 ? ' bad' : pct >= 65 ? ' warn' : '';
           return {
-            id: t.id, name: t.name, area: t.areaName,
+            id: t.id, name: T(t.areaName) + t.name.slice(t.areaName.length), area: T(t.areaName),
             kindChip: kindChip(t.kind),
             badge: U.stateBadge(stt).outerHTML,
             kw: t.baseKW,
@@ -287,11 +288,11 @@
     row.appendChild(marker);
 
     var name = el('span', 'md-nm');
-    name.textContent = node.name;
+    name.textContent = T(node.name);
     row.appendChild(name);
 
     var tag = el('span', 'md-tag');
-    tag.textContent = selectable ? node.id : node.type.toUpperCase();
+    tag.textContent = selectable ? node.id : T(node.type.toUpperCase());
     row.appendChild(tag);
 
     // per-level count chip on branch nodes (how many children below it)
@@ -324,12 +325,12 @@
 
     selPoints = M.pointsForEquipment(id);
     var cat = M.categoryFor(id);
-    if (ptMeta) ptMeta.textContent = id + ' · ' + cat + ' · ' + selPoints.length + ' points';
+    if (ptMeta) ptMeta.textContent = id + ' · ' + cat + ' · ' + selPoints.length + ' ' + T('points');
 
     // full rebuild of the point table on selection change (values resolve next update)
     ptTbl.set(selPoints.map(function (pt) {
       return {
-        tag: pt.tag, desc: pt.desc, unit: pt.unit || '', bus: pt.bus, addr: pt.addr,
+        tag: pt.tag, desc: T(pt.desc), unit: pt.unit || '', bus: pt.bus, addr: pt.addr,
         value: fmtNum(pt.nominal)
       };
     }));

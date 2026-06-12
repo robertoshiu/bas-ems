@@ -17,6 +17,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, fmt = U.fmt;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   var gRes, gToc, heroFlow, hk = {},
       qualTbl, trainRows = [], chip = {}, fc = 0,
@@ -54,8 +55,8 @@
     id: 'upw', title: 'Ultrapure Water', group: 'BAS', order: 3, icon: 'water',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Ultrapure Water (UPW)</h1>' +
-        '<span class="crumb">FAB-1 · 18.2 MΩ·cm · TOC · Reclaim</span>';
+      head.innerHTML = '<h1>' + T('Ultrapure Water (UPW)') + '</h1>' +
+        '<span class="crumb">FAB-1 · 18.2 MΩ·cm · TOC · ' + T('Reclaim') + '</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -66,7 +67,7 @@
 
       // signature: large resistivity ring + smaller TOC ring, side by side
       var sig = el('div', 'pg-hero-sig center upw-sig');
-      sig.appendChild(el('div', 'pg-hero-label', 'POLISH-LOOP QUALITY'));
+      sig.appendChild(el('div', 'pg-hero-label', T('POLISH-LOOP QUALITY')));
       var rings = el('div', 'upw-rings');
       gRes = U.ringGauge({
         size: 168, label: 'Resistivity', unit: 'MΩ·cm', min: 17.8, max: 18.3, glow: true,
@@ -84,13 +85,13 @@
       var tocWrap = el('div', 'upw-ring-sm'); tocWrap.appendChild(gToc.el);
       rings.appendChild(tocWrap);
       sig.appendChild(rings);
-      sig.appendChild(el('div', 'pg-hero-sub upw-target', 'Target 18.2 MΩ·cm @25°C · sub-ppb TOC'));
+      sig.appendChild(el('div', 'pg-hero-sub upw-target', T('Target 18.2 MΩ·cm @25°C · sub-ppb TOC')));
       hero.appendChild(sig);
 
       // make-up flow big-read + KPI strip
       var right = el('div', 'upw-hero-right');
       var flowBlock = el('div', 'upw-flow-block');
-      flowBlock.appendChild(el('div', 'pg-hero-label', 'MAKE-UP FLOW'));
+      flowBlock.appendChild(el('div', 'pg-hero-label', T('MAKE-UP FLOW')));
       heroFlow = el('div', 'pg-hero-read upw-flow-read');
       var fnum = el('span'); heroFlow.appendChild(fnum);
       heroFlow.appendChild(el('span', 'u', 'm³/h'));
@@ -107,7 +108,7 @@
        ['n2', 'N₂ Blanket', 'Nm³/h', '']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         if (k[2]) v.appendChild(el('span', 'u', k[2]));
@@ -126,11 +127,11 @@
       schP._body.style.padding = '8px 14px 12px';
       upwSch = U.Schematic(schP._body, {
         nodes: [
-          { id: 'raw',   label: 'Raw Water',    x: 12,  y: 30, channel: 'upwFlow' },
-          { id: 'ro',    label: 'RO Unit',       x: 124, y: 30, channel: 'upwFlow' },
+          { id: 'raw',   label: T('Raw Water'),    x: 12,  y: 30, channel: 'upwFlow' },
+          { id: 'ro',    label: T('RO Unit'),       x: 124, y: 30, channel: 'upwFlow' },
           { id: 'edi',   label: 'EDI',           x: 236, y: 30, channel: 'upwFlow' },
-          { id: 'polish',label: 'Polish Loop',   x: 348, y: 30, channel: 'upwFlow' },
-          { id: 'pou',   label: 'Pt-of-Use',     x: 460, y: 30, channel: 'upwFlow' }
+          { id: 'polish',label: T('Polish Loop'),   x: 348, y: 30, channel: 'upwFlow' },
+          { id: 'pou',   label: T('Pt-of-Use'),     x: 460, y: 30, channel: 'upwFlow' }
         ],
         pipes: [
           { from: 'raw',    to: 'ro',     channel: 'upwFlow' },
@@ -160,15 +161,15 @@
       BAS.master.facility.upwTrains.forEach(function (tr, i) {
         var card = el('div', 'status-card ok');
         var hd = el('div', 'sc-head');
-        hd.appendChild(el('div', 'sc-name', tr.name));
+        hd.appendChild(el('div', 'sc-name', T(tr.name)));
         var badge = el('span'); badge.appendChild(U.stateBadge('Productive'));
         hd.appendChild(badge);
         card.appendChild(hd);
 
         var stats = el('div', 'sc-stats');
-        var mk = scStat(stats, 'Make-up Flow');
-        var pk = scStat(stats, 'Polish Pump');
-        var lvlV = scStat(stats, 'Storage Tank');
+        var mk = scStat(stats, T('Make-up Flow'));
+        var pk = scStat(stats, T('Polish Pump'));
+        var lvlV = scStat(stats, T('Storage Tank'));
         card.appendChild(stats);
 
         var lvlM = el('div', 'meter good upw-tank'); lvlM.appendChild(el('i'));
@@ -188,13 +189,13 @@
       var spWrap = el('div', 'upw-trends');
 
       var fCol = el('div', 'upw-trend');
-      fCol.appendChild(trendHead('UPW Make-up Flow', 'm³/h', chip, 'f'));
+      fCol.appendChild(trendHead(T('UPW Make-up Flow'), 'm³/h', chip, 'f'));
       var cFlow = el('canvas', 'spark'); cFlow.style.height = '64px'; cFlow.style.width = '100%';
       fCol.appendChild(cFlow);
       spWrap.appendChild(fCol);
 
       var rCol = el('div', 'upw-trend');
-      rCol.appendChild(trendHead('Loop Resistivity', 'MΩ·cm', chip, 'r'));
+      rCol.appendChild(trendHead(T('Loop Resistivity'), 'MΩ·cm', chip, 'r'));
       var cRes = el('canvas', 'spark'); cRes.style.height = '64px'; cRes.style.width = '100%';
       rCol.appendChild(cRes);
       spWrap.appendChild(rCol);
@@ -229,7 +230,7 @@
 
       // hero make-up flow big-read + sub
       heroFlow._num.textContent = fmt.int(flow);
-      heroFlow._sub.textContent = res.toFixed(3) + ' MΩ·cm loop · ' + toc.toFixed(2) + ' ppb TOC';
+      heroFlow._sub.textContent = res.toFixed(3) + ' MΩ·cm ' + T('loop') + ' · ' + toc.toFixed(2) + ' ppb TOC';
 
       // trains carry the split make-up flow; count online for the KPI strip
       var nTr = trainRows.length || 1;
@@ -331,9 +332,9 @@
   // SCADA 3-level convention: good=green (Productive), warn=amber (NearSpec), bad=red (UnscheduledDown).
   // warn uses st-NearSpec (amber) NOT st-Standby (blue) — blue reads as "offline/standby" to an operator.
   function qualBadge(bandResult) {
-    if (bandResult === 'bad')  return badgeHtml('UnscheduledDown', 'Excursion');
-    if (bandResult === 'warn') return badgeHtml('NearSpec',        'Near-spec');
-    return badgeHtml('Productive', 'In-spec');
+    if (bandResult === 'bad')  return badgeHtml('UnscheduledDown', T('Excursion'));
+    if (bandResult === 'warn') return badgeHtml('NearSpec',        T('Near-spec'));
+    return badgeHtml('Productive', T('In-spec'));
   }
 
   // td-meter headroom bar: how much of the spec window is consumed (0..100).
@@ -375,21 +376,21 @@
     var tempPct = Math.abs(temp - 23.5) / 1.0 * 100;              // distance from setpoint vs ±1 band
 
     return [
-      { param: 'Resistivity',      value: res.toFixed(2) + ' MΩ·cm',  spec: '≥ 18.1',
+      { param: T('Resistivity'),      value: res.toFixed(2) + ' MΩ·cm',  spec: '≥ 18.1',
         meter: tdMeter(resPct, bandCls(resBand)),   badge: qualBadge(resBand) },
-      { param: 'TOC',              value: toc.toFixed(2) + ' ppb',     spec: '< 1',
+      { param: T('TOC'),              value: toc.toFixed(2) + ' ppb',     spec: '< 1',
         meter: tdMeter(tocPct, bandCls(tocBand)),   badge: qualBadge(tocBand) },
-      { param: 'Dissolved O₂',     value: do2.toFixed(2) + ' ppb',     spec: '< 1',
+      { param: T('Dissolved O₂'),     value: do2.toFixed(2) + ' ppb',     spec: '< 1',
         meter: tdMeter(do2Pct, 'good'),             badge: qualBadge('good') },
-      { param: 'Silica',           value: sio2.toFixed(2) + ' ppb',    spec: '< 0.5',
+      { param: T('Silica'),           value: sio2.toFixed(2) + ' ppb',    spec: '< 0.5',
         meter: tdMeter(sio2Pct, 'good'),            badge: qualBadge('good') },
-      { param: 'Boron',            value: boron.toFixed(3) + ' ppb',   spec: '< 0.05',
+      { param: T('Boron'),            value: boron.toFixed(3) + ' ppb',   spec: '< 0.05',
         meter: tdMeter(boronPct, 'good'),           badge: qualBadge('good') },
-      { param: 'Particles > 50 nm',value: part + ' /mL',              spec: '< 100',
+      { param: T('Particles > 50 nm'),value: part + ' /mL',              spec: '< 100',
         meter: tdMeter(partPct, bandCls(partBand)), badge: qualBadge(partBand) },
-      { param: 'Bacteria',         value: bact.toFixed(2) + ' CFU/mL', spec: '< 1',
+      { param: T('Bacteria'),         value: bact.toFixed(2) + ' CFU/mL', spec: '< 1',
         meter: tdMeter(bactPct, 'good'),            badge: qualBadge('good') },
-      { param: 'Temperature',      value: temp.toFixed(1) + ' °C',     spec: '23.5 ± 1',
+      { param: T('Temperature'),      value: temp.toFixed(1) + ' °C',     spec: '23.5 ± 1',
         meter: tdMeter(tempPct, 'good'),            badge: qualBadge('good') }
     ];
   }

@@ -5,12 +5,13 @@ window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el;
+  var tr = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // ---- KPI tile ---------------------------------------------------------
   U.kpi = function (opts) {
     opts = opts || {};
     var node = el('div', 'kpi' + (opts.accent ? ' accent' : ''));
-    var lab = el('div', 'label', opts.label || '');
+    var lab = el('div', 'label', tr(opts.label || ''));
     var val = el('div', 'val');
     var num = el('span'); val.appendChild(num);
     var u = el('span', 'u', opts.unit || ''); val.appendChild(u);
@@ -104,7 +105,7 @@ window.BAS = window.BAS || {};
     // role="meter" is required for aria-value* to be exposed to assistive tech;
     // give it an accessible name from the gauge's own label/unit.
     s.setAttribute('role', 'meter');
-    s.setAttribute('aria-label', (opts.label || 'gauge') + (opts.unit ? ' (' + opts.unit + ')' : ''));
+    s.setAttribute('aria-label', tr(opts.label || 'gauge') + (opts.unit ? ' (' + opts.unit + ')' : ''));
     s.setAttribute('aria-valuemin', String(min));
     s.setAttribute('aria-valuemax', String(max));
     s.setAttribute('aria-valuenow', String(min));
@@ -115,7 +116,7 @@ window.BAS = window.BAS || {};
     var t2 = U.svg('text', { x: 50, y: 65, 'text-anchor': 'middle', fill: U.cssVar('--text-mut'), 'font-size': 8 });
     t2.textContent = opts.unit || '';
     var t3 = U.svg('text', { x: 50, y: 86, 'text-anchor': 'middle', fill: U.cssVar('--text-mut'), 'font-size': 7.5 });
-    t3.textContent = (opts.label || '').toUpperCase();
+    t3.textContent = tr(opts.label || '').toUpperCase();
     s.appendChild(t1); s.appendChild(t2); s.appendChild(t3);
     node.appendChild(s);
     var lastNow = min;
@@ -141,7 +142,7 @@ window.BAS = window.BAS || {};
     var wrap = el('div'); wrap.style.overflow = 'auto'; if (opts.maxH) wrap.style.maxHeight = opts.maxH;
     var t = el('table', 'tbl');
     var thead = el('thead'); var htr = el('tr');
-    columns.forEach(function (c) { var th = el('th', c.thCls || ''); th.textContent = c.label; htr.appendChild(th); });
+    columns.forEach(function (c) { var th = el('th', c.thCls || ''); th.textContent = tr(c.label); htr.appendChild(th); });
     thead.appendChild(htr); t.appendChild(thead);
     var tb = el('tbody'); t.appendChild(tb); wrap.appendChild(t);
     return {
@@ -167,7 +168,7 @@ window.BAS = window.BAS || {};
     var rows = items.map(function (it) {
       var r = el('div'); r.style.margin = '0 0 9px';
       var top = el('div'); top.style.display = 'flex'; top.style.justifyContent = 'space-between'; top.style.fontSize = 'var(--fs-2)';
-      var k = el('span', 'dim', it.label); var v = el('span', 'mono'); v.textContent = '';
+      var k = el('span', 'dim', tr(it.label)); var v = el('span', 'mono'); v.textContent = '';
       top.appendChild(k); top.appendChild(v);
       var m = el('div', 'meter'); var fillEl = el('i'); m.appendChild(fillEl);
       r.appendChild(top); r.appendChild(m); node.appendChild(r);
@@ -223,7 +224,7 @@ window.BAS = window.BAS || {};
     node.style.width = size + 'px';
     var s = U.svg('svg', { viewBox: '0 0 100 100', width: size, height: size });
     s.setAttribute('role', 'meter');
-    s.setAttribute('aria-label', (opts.label || 'gauge') + (opts.unit ? ' (' + opts.unit + ')' : ''));
+    s.setAttribute('aria-label', tr(opts.label || 'gauge') + (opts.unit ? ' (' + opts.unit + ')' : ''));
     s.setAttribute('aria-valuemin', String(min));
     s.setAttribute('aria-valuemax', String(max));
     s.setAttribute('aria-valuenow', String(min));
@@ -239,7 +240,7 @@ window.BAS = window.BAS || {};
     unitT.textContent = opts.unit || '';
     var labT = U.svg('text', { x: 50, y: 86, 'text-anchor': 'middle',
       fill: U.cssVar('--text-mut'), 'font-size': 7.5, 'letter-spacing': '.08em' });
-    labT.textContent = (opts.label || '').toUpperCase();
+    labT.textContent = tr(opts.label || '').toUpperCase();
     s.appendChild(valT); s.appendChild(unitT); s.appendChild(labT);
     node.appendChild(s);
     var lastTxt = null, lastFrac = -1, lastNow = min, lastStroke = baseColor;
@@ -281,7 +282,7 @@ window.BAS = window.BAS || {};
     // shorter viewBox height — the dial is wider than tall.
     var s = U.svg('svg', { viewBox: '0 0 100 88', width: size, height: Math.round(size * 0.88) });
     s.setAttribute('role', 'meter');
-    s.setAttribute('aria-label', (opts.label || 'dial') + (opts.unit ? ' (' + opts.unit + ')' : ''));
+    s.setAttribute('aria-label', tr(opts.label || 'dial') + (opts.unit ? ' (' + opts.unit + ')' : ''));
     s.setAttribute('aria-valuemin', String(min));
     s.setAttribute('aria-valuemax', String(max));
     s.setAttribute('aria-valuenow', String(min));
@@ -297,7 +298,7 @@ window.BAS = window.BAS || {};
     unitT.textContent = opts.unit || '';
     var labT = U.svg('text', { x: 50, y: 82, 'text-anchor': 'middle',
       fill: U.cssVar('--text-mut'), 'font-size': 7.5, 'letter-spacing': '.08em' });
-    labT.textContent = (opts.label || '').toUpperCase();
+    labT.textContent = tr(opts.label || '').toUpperCase();
     s.appendChild(valT); s.appendChild(unitT); s.appendChild(labT);
     node.appendChild(s);
     var lastTxt = null, lastFrac = -1, lastNow = min, lastStroke = baseColor;
