@@ -15,6 +15,8 @@ window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el;
+  // i18n: plain dict[s]||s lookup (no per-call regex). Wrap at render/build time.
+  var t = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   var reducedMotion = (typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -319,7 +321,7 @@ window.BAS = window.BAS || {};
     root = el('div', 'tour-root');
     root.style.display = 'none';
     root.setAttribute('role', 'dialog');
-    root.setAttribute('aria-label', 'Guided tour');
+    root.setAttribute('aria-label', t('Guided tour'));
 
     // Dim layer (catches outside clicks -> exit). The spotlight box itself carries
     // the big box-shadow that does the dimming; this layer is a transparent click trap.
@@ -332,7 +334,7 @@ window.BAS = window.BAS || {};
     root.appendChild(spot);
 
     // "click outside to exit" hint
-    hint = el('div', 'tour-hint', 'Click outside the highlight to exit · Esc');
+    hint = el('div', 'tour-hint', t('Click outside the highlight to exit · Esc'));
     root.appendChild(hint);
 
     // Caption card
@@ -352,13 +354,13 @@ window.BAS = window.BAS || {};
     card.appendChild(elWhy);
 
     var ctrls = el('div', 'tour-ctrls');
-    btnPrev = el('button', 'tour-btn', 'Prev');
+    btnPrev = el('button', 'tour-btn', t('Prev'));
     btnPrev.addEventListener('click', function (e) { e.stopPropagation(); prev(); });
-    btnPause = el('button', 'tour-btn tour-btn-pause', 'Pause');
+    btnPause = el('button', 'tour-btn tour-btn-pause', t('Pause'));
     btnPause.addEventListener('click', function (e) { e.stopPropagation(); togglePause(); });
-    btnNext = el('button', 'tour-btn tour-btn-next', 'Next');
+    btnNext = el('button', 'tour-btn tour-btn-next', t('Next'));
     btnNext.addEventListener('click', function (e) { e.stopPropagation(); next(); });
-    var btnExit = el('button', 'tour-btn tour-btn-exit', 'Exit');
+    var btnExit = el('button', 'tour-btn tour-btn-exit', t('Exit'));
     btnExit.addEventListener('click', function (e) { e.stopPropagation(); stop(); });
     ctrls.appendChild(btnPrev);
     ctrls.appendChild(btnPause);
@@ -387,14 +389,14 @@ window.BAS = window.BAS || {};
     var box = el('div', 'tour-modal');
     box.addEventListener('click', function (e) { e.stopPropagation(); });
     box.appendChild(el('div', 'tour-modal-eyebrow', 'bas‑ems'));
-    box.appendChild(el('div', 'tour-modal-title', 'Guided tour of the fab BAS/EMS'));
+    box.appendChild(el('div', 'tour-modal-title', t('Guided tour of the fab BAS/EMS')));
     box.appendChild(el('div', 'tour-modal-body',
-      'Take a 3-minute walkthrough of the whole console — from facility demand and the live fab floor, ' +
-      'through cleanroom, cooling, water and exhaust, out to the energy and sustainability desks.'));
+      t('Take a 3-minute walkthrough of the whole console — from facility demand and the live fab floor, ' +
+        'through cleanroom, cooling, water and exhaust, out to the energy and sustainability desks.')));
     var row = el('div', 'tour-modal-ctrls');
-    var startBtn = el('button', 'tour-btn tour-btn-next tour-modal-start', 'Start tour');
+    var startBtn = el('button', 'tour-btn tour-btn-next tour-modal-start', t('Start tour'));
     startBtn.addEventListener('click', function (e) { e.stopPropagation(); hideModal(); start(); });
-    var skipBtn = el('button', 'tour-btn tour-modal-skip', 'Explore on my own');
+    var skipBtn = el('button', 'tour-btn tour-modal-skip', t('Explore on my own'));
     skipBtn.addEventListener('click', function (e) { e.stopPropagation(); hideModal(); });
     row.appendChild(startBtn);
     row.appendChild(skipBtn);
@@ -537,14 +539,17 @@ window.BAS = window.BAS || {};
   // ---- Step rendering ----------------------------------------------------
   function renderStep() {
     var step = STEPS[idx];
-    elChapter.textContent = step._chapter;
+    elChapter.textContent = t(step._chapter);
     elProg.textContent = (idx + 1) + ' / ' + STEPS.length;
-    elTitle.textContent = step.title;
-    elBody.textContent = step.body;
-    elWhy.textContent = step.why;
+    elTitle.textContent = t(step.title);
+    elBody.textContent = t(step.body);
+    elWhy.textContent = t(step.why);
     card.setAttribute('data-beat', step.beat || '');
     btnPrev.disabled = (idx === 0);
-    btnNext.textContent = (idx === STEPS.length - 1) ? 'Finish' : 'Next';
+    // Static control labels also re-translated each render (cheap, not per-frame).
+    btnPrev.textContent = t('Prev');
+    btnPause.textContent = paused ? t('Resume') : t('Pause');
+    btnNext.textContent = (idx === STEPS.length - 1) ? t('Finish') : t('Next');
   }
 
   // Run a step: route if needed, then position spotlight (twice, post-stagger),
@@ -637,13 +642,13 @@ window.BAS = window.BAS || {};
     stepRemaining = Math.max(0, stepRemaining - elapsed);
     if (advanceTid) { clearTimeout(advanceTid); advanceTid = null; }
     freezeBar();
-    btnPause.textContent = 'Resume';
+    btnPause.textContent = t('Resume');
     root.classList.add('paused');
   }
   function resume() {
     if (!paused) return;
     paused = false;
-    btnPause.textContent = 'Pause';
+    btnPause.textContent = t('Pause');
     root.classList.remove('paused');
     startTimer(stepRemaining > 0 ? stepRemaining : (STEPS[idx].dur || DEFAULT_DUR));
   }
@@ -676,13 +681,13 @@ window.BAS = window.BAS || {};
   function start() {
     hideModal();
     buildDom();
-    if (active) { idx = 0; paused = false; btnPause.textContent = 'Pause'; runStep(); return; }
+    if (active) { idx = 0; paused = false; btnPause.textContent = t('Pause'); runStep(); return; }
     active = true;
     paused = false;
     idx = 0;
     markSeen();
     root.style.display = '';
-    btnPause.textContent = 'Pause';
+    btnPause.textContent = t('Pause');
     root.classList.remove('paused');
     // Bind keyboard in capture phase so we win over the shell's digit/arrow handlers.
     window.addEventListener('keydown', onKey, true);

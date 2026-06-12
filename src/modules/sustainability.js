@@ -12,6 +12,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, fmt = U.fmt;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // grid emission factor used by sim.js for the Scope 2 calc (kgCO2e/kWh).
   var GRID_EF = 0.34;
@@ -41,8 +42,8 @@
     id: 'sustainability', title: 'Sustainability', group: 'EMS', order: 2, icon: 'leaf',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Sustainability &amp; Carbon</h1>' +
-        '<span class="crumb">FAB-1 · CO₂e · Renewable · Water Reuse</span>';
+      head.innerHTML = '<h1>' + T('Sustainability & Carbon') + '</h1>' +
+        '<span class="crumb">FAB-1 · CO₂e · ' + T('Renewable · Water Reuse') + '</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -60,23 +61,23 @@
       ringCO2 = U.ringGauge({ size: 132, label: 'CO₂e', unit: 't/h', min: 0, max: 18,
         glow: true, color: U.cssVar('--accent'), fmt: fmt2,
         thresholds: { warn: 9, bad: 12 } });            // higher = worse
-      ringsWrap.appendChild(ringCell(ringCO2.el, 'Scope 2 Rate'));
+      ringsWrap.appendChild(ringCell(ringCO2.el, T('Scope 2 Rate')));
 
       ringRen = U.ringGauge({ size: 132, label: 'Renew', unit: '%', min: 0, max: 60,
         glow: true, color: U.cssVar('--good'), fmt: pct1,
         thresholds: { warn: 25, bad: 18, invert: true } });  // lower = worse
-      ringsWrap.appendChild(ringCell(ringRen.el, 'Renewable Mix'));
+      ringsWrap.appendChild(ringCell(ringRen.el, T('Renewable Mix')));
 
       ringReu = U.ringGauge({ size: 132, label: 'Reuse', unit: '%', min: 0, max: 100,
         glow: true, color: U.cssVar('--accent'), fmt: pct1,
         thresholds: { warn: 70, bad: 60, invert: true } }); // lower = worse
-      ringsWrap.appendChild(ringCell(ringReu.el, 'Water Reclaim'));
+      ringsWrap.appendChild(ringCell(ringReu.el, T('Water Reclaim')));
 
       sig.appendChild(ringsWrap);
 
       // daily projection big-read beneath the rings
       var dayRead = el('div', 'sus-dayread');
-      dayRead.appendChild(el('div', 'pg-hero-label', 'DAILY CO₂e PROJECTION'));
+      dayRead.appendChild(el('div', 'pg-hero-label', T('DAILY CO₂e PROJECTION')));
       var bigr = el('div', 'pg-hero-read');
       heroDayNum = el('span'); bigr.appendChild(heroDayNum);
       var bigu = el('span', 'u', 't/day'); bigr.appendChild(bigu);
@@ -92,7 +93,7 @@
        ['intMove', 'per Wafer-Move', 'kg', 'good']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         var vu = el('span', 'u', k[2]); v.appendChild(vu);
@@ -137,7 +138,7 @@
        ['wind', 'Wind PPA', 'sus-dot-wind']].forEach(function (m) {
         var chip = el('div', 'chip');
         var dot = el('span', 'sus-dot ' + m[2]); chip.appendChild(dot);
-        chip.appendChild(el('span', 'k', m[1]));
+        chip.appendChild(el('span', 'k', T(m[1])));
         var v = el('span', 'v', '—'); chip.appendChild(v);
         legend.appendChild(chip);
         mixChip[m[0]] = v;
@@ -172,7 +173,7 @@
       var rsub = el('div'); rsub.style.marginTop = '12px';
       var rtop = el('div'); rtop.style.display = 'flex'; rtop.style.justifyContent = 'space-between';
       rtop.style.fontSize = 'var(--fs-2)';
-      rtop.appendChild(el('span', 'dim', 'Reuse Efficiency'));
+      rtop.appendChild(el('span', 'dim', T('Reuse Efficiency')));
       reuseMeterVal = el('span', 'mono'); reuseMeterVal.textContent = '—';
       rtop.appendChild(reuseMeterVal);
       reuseMeter = el('div', 'meter good'); var ri = el('i'); ri.style.width = '0%'; reuseMeter.appendChild(ri);
@@ -303,14 +304,14 @@
         reuseMeterVal.textContent = fmt.n(reusePct, 1) + ' %';
 
         // ---- Decarbonization target live values -------------------------
-        tgtRenVal.textContent = fmt.n(ren, 1) + '% -> 60% RE100';
+        tgtRenVal.textContent = fmt.n(ren, 1) + '% ' + T('-> 60% RE100');
         var renRatio = Math.min(1, ren / 60);
         tgtRenBar._fill.style.width = (renRatio * 100).toFixed(1) + '%';
         tgtRenBar.className = 'meter ' + U.band(ren, 40, 25, true);
 
-        tgtCO2Val.textContent = fmt.n(co2e, 2) + ' t/h -> FY2035';
+        tgtCO2Val.textContent = fmt.n(co2e, 2) + ' t/h ' + T('-> FY2035');
 
-        tgtWaterVal.textContent = fmt.n(reusePct, 1) + '% -> >80%';
+        tgtWaterVal.textContent = fmt.n(reusePct, 1) + '% ' + T('-> >80%');
         var waterRatio = Math.min(1, reusePct / 80);
         tgtWaterBar._fill.style.width = (waterRatio * 100).toFixed(1) + '%';
         tgtWaterBar.className = 'meter ' + U.band(reusePct, 75, 65, true);
@@ -336,9 +337,9 @@
   // a water-flow node: title + sub + live value (value ref stored in flowNode)
   function flowNodeEl(key, title, sub, cls) {
     var n = el('div', 'sus-fnode ' + cls);
-    n.appendChild(el('div', 'sus-fn-t', title));
+    n.appendChild(el('div', 'sus-fn-t', T(title)));
     var v = el('div', 'sus-fn-v', '—'); n.appendChild(v);
-    n.appendChild(el('div', 'sus-fn-s', sub));
+    n.appendChild(el('div', 'sus-fn-s', T(sub)));
     flowNode[key] = v;
     return n;
   }
@@ -355,7 +356,7 @@
 
     function tgtRow(label, initVal, withMeter) {
       var r = el('div', 'stat-line');
-      r.appendChild(el('span', 'k', label));
+      r.appendChild(el('span', 'k', T(label)));
       var v = el('span', 'v', initVal);
       r.appendChild(v);
       wrap.appendChild(r);
@@ -391,7 +392,7 @@
   function fmt2(v) { return v.toFixed(2); }
 
   function subhead(text) {
-    var s = el('div', 'dim', text);
+    var s = el('div', 'dim', T(text));
     s.style.fontSize = 'var(--fs-1)'; s.style.letterSpacing = '.05em';
     s.style.textTransform = 'uppercase'; s.style.margin = '0 0 8px';
     return s;
@@ -403,7 +404,7 @@
     defs.forEach(function (d) {
       var key = d[0], label = d[1];
       var r = el('div', 'stat-line');
-      r.appendChild(el('span', 'k', label));
+      r.appendChild(el('span', 'k', T(label)));
       var v = el('span', 'v', '—');
       if (presets && presets[key] != null) v.textContent = presets[key];
       r.appendChild(v);

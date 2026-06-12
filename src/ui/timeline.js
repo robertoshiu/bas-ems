@@ -7,6 +7,7 @@ window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el;
+  var t = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
   var STATE_COL = {
     'Productive': '#34d399', 'Standby': '#3a9dff', 'Engineering': '#9a7bff',
     'Scheduled Down': '#f5b73d', 'Unscheduled Down': '#ff5d6c', 'Non-Scheduled': '#5c6981'
@@ -26,7 +27,7 @@ window.BAS = window.BAS || {};
     var bar = el('div', 'tl-transport');
     var playBtn = el('button', 'tl-btn', '❚❚');          // shows pause glyph while live
     var clock = el('span', 'tl-clock', '00:00:00');
-    var pill = el('span', 'tl-pill live', 'LIVE');
+    var pill = el('span', 'tl-pill live', t('LIVE'));
     // tool selector for E10 ribbon lane
     var toolSel = el('select', 'tl-select');
     BAS.master.tools.forEach(function (t) { var o = el('option'); o.value = t.id; o.textContent = t.id; toolSel.appendChild(o); });
@@ -170,7 +171,7 @@ window.BAS = window.BAS || {};
     chevron.addEventListener('click', function () { collapsed = !collapsed; chevron.textContent = collapsed ? '▴' : '▾'; staticW = -1; });
 
     var offChange = CS.onChange(function (mode) {
-      pill.className = 'tl-pill ' + mode; pill.textContent = mode.toUpperCase();
+      pill.className = 'tl-pill ' + mode; pill.textContent = t(mode.toUpperCase());
       playBtn.textContent = (mode === 'live') ? '❚❚' : '▶';
     });
 

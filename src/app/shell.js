@@ -5,6 +5,9 @@ window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el;
+  // i18n: t() is a plain dict[s]||s lookup (no per-call regex/split) — safe to call
+  // at build time and cheaply at render time. Guard in case i18n didn't load.
+  var t = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   var refs = {}, mounted = {}, activeId = null, ticker = null;
   var GROUP_ORDER = ['Operations', 'BAS', 'EMS', 'Master Data'];
@@ -97,7 +100,7 @@ window.BAS = window.BAS || {};
   };
 
   function demoBuildCaption(frame, moduleId) {
-    var moduleLabel = DEMO_MODULE_LABELS[moduleId] || moduleId;
+    var moduleLabel = t(DEMO_MODULE_LABELS[moduleId] || moduleId);
     var evts = frame.newEvents;
     var kp = frame.kpis;
     var eventSentence = '';
@@ -201,13 +204,13 @@ window.BAS = window.BAS || {};
     brand.appendChild(el('div', 'logo'));
     var nm = el('div');
     nm.appendChild(el('div', 'name', 'bas&#8209;ems'));
-    nm.appendChild(el('div', 'sub', 'Fab Building Automation · Energy Mgmt'));
+    nm.appendChild(el('div', 'sub', t('Fab Building Automation · Energy Mgmt')));
     brand.appendChild(nm);
     top.appendChild(brand);
 
     var mark = el('div', 'simmark');
     mark.appendChild(el('span', 'dot'));
-    mark.appendChild(document.createTextNode('Simulation · Synthetic Data'));
+    mark.appendChild(document.createTextNode(t('Simulation · Synthetic Data')));
     top.appendChild(mark);
 
     top.appendChild(el('div', 'spacer'));
@@ -217,26 +220,38 @@ window.BAS = window.BAS || {};
     [['demand', 'Total Demand', 'accent'], ['overhead', 'Facility Overhead', ''], ['oee', 'Fleet OEE', 'good'],
      ['moves', 'Wafer Moves/h', ''], ['peak', 'Demand vs Peak', '']].forEach(function (k) {
       var box = el('div', 'hdr-kpi');
-      box.appendChild(el('div', 'label', k[1]));
+      box.appendChild(el('div', 'label', t(k[1])));
       var v = el('div', 'val ' + (k[2] || '')); v.textContent = '—';
       box.appendChild(v); kpis.appendChild(box); refs.hk[k[0]] = v;
     });
     top.appendChild(kpis);
 
     var clock = el('div', 'clock');
-    clock.innerHTML = '<span class="d">SHIFT&nbsp;</span><span id="clk">00:00:00</span>';
-    clock.setAttribute('aria-label', 'Simulation clock');
+    clock.innerHTML = '<span class="d">' + t('SHIFT') + '&nbsp;</span><span id="clk">00:00:00</span>';
+    clock.setAttribute('aria-label', t('Simulation clock'));
     top.appendChild(clock);
     refs.clock = clock.querySelector('#clk');
 
     // guided-tour launch button (replaces the old auto-rotate demo mode)
     var demoBtn = el('button', 'demo-btn');
-    demoBtn.textContent = 'GUIDED TOUR';
-    demoBtn.title = 'Guided tour — a narrated walkthrough of the whole console (D)';
+    demoBtn.textContent = t('GUIDED TOUR');
+    demoBtn.title = t('Guided tour — a narrated walkthrough of the whole console (D)');
     demoBtn.setAttribute('aria-pressed', 'false');
     demoBtn.addEventListener('click', function () { if (BAS.tour) BAS.tour.toggle(); });
     top.appendChild(demoBtn);
     refs.demoBtn = demoBtn;
+
+    // language toggle — shows the OTHER language's label. en -> '中文', zh -> 'EN'.
+    var langBtn = el('button', 'lang-btn');
+    var isZh = (BAS.i18n && BAS.i18n.lang === 'zh');
+    langBtn.textContent = isZh ? 'EN' : '中文';
+    langBtn.title = isZh ? 'Switch to English' : '切換為繁體中文';
+    langBtn.setAttribute('aria-label', langBtn.title);
+    langBtn.addEventListener('click', function () {
+      if (BAS.i18n) BAS.i18n.set(isZh ? 'en' : 'zh');
+    });
+    top.appendChild(langBtn);
+    refs.langBtn = langBtn;
 
     app.appendChild(top);
 
@@ -247,7 +262,7 @@ window.BAS = window.BAS || {};
     demoCaption.setAttribute('aria-live', 'polite');
     demoCaption.style.display = 'none';
     var demoCaptionText = el('span', 'demo-caption-text');
-    demoCaptionText.textContent = 'Demo mode — live production → facility coupling';
+    demoCaptionText.textContent = t('Demo mode — live production → facility coupling');
     demoCaption.appendChild(el('span', 'demo-caption-icon', '▶'));
     demoCaption.appendChild(demoCaptionText);
     document.body.appendChild(demoCaption);
@@ -293,14 +308,14 @@ window.BAS = window.BAS || {};
 
     var rail = el('div', 'eventrail');
     var rh = el('div', 'rail-h');
-    rh.appendChild(el('span', 't', 'Event Stream'));
+    rh.appendChild(el('span', 't', t('Event Stream')));
     var rate = el('span', 'rate', '0 evt/s'); rh.appendChild(rate);
     rail.appendChild(rh);
 
     // Filter button strip — drives CSS container-class filtering on .stream
     var filterBar = el('div', 'evt-filters');
     filterBar.setAttribute('role', 'group');
-    filterBar.setAttribute('aria-label', 'Filter event stream');
+    filterBar.setAttribute('aria-label', t('Filter event stream'));
     var FILTERS = [
       { label: 'All',     key: 'all' },
       { label: 'Lot/Job', key: 'lotjob' },
@@ -326,7 +341,7 @@ window.BAS = window.BAS || {};
     (function () {
       for (var fi = 0; fi < FILTERS.length; fi++) {
         var fb = el('button', 'evt-filter-btn');
-        fb.textContent = FILTERS[fi].label;
+        fb.textContent = t(FILTERS[fi].label);
         fb.dataset.fkey = FILTERS[fi].key;
         fb.setAttribute('aria-pressed', FILTERS[fi].key === 'all' ? 'true' : 'false');
         if (FILTERS[fi].key === 'all') fb.classList.add('active');
@@ -457,13 +472,13 @@ window.BAS = window.BAS || {};
 
     // header row
     var hdr = el('div', 'alarm-dd-hdr');
-    var title = el('span', 'alarm-dd-title', histMode ? 'Alarm History' : 'Active Alarms');
+    var title = el('span', 'alarm-dd-title', histMode ? t('Alarm History') : t('Active Alarms'));
     hdr.appendChild(title);
 
     var btns = el('div', 'alarm-dd-btns');
     if (!histMode) {
       var histBtn = el('button', 'history-btn');
-      histBtn.textContent = 'History';
+      histBtn.textContent = t('History');
       histBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         renderDropdown(true);
@@ -471,7 +486,7 @@ window.BAS = window.BAS || {};
       btns.appendChild(histBtn);
     } else {
       var backBtn = el('button', 'history-btn');
-      backBtn.textContent = 'Active';
+      backBtn.textContent = t('Active');
       backBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         renderDropdown(false);
@@ -480,7 +495,7 @@ window.BAS = window.BAS || {};
     }
     var closeBtn = el('button', 'alarm-dd-close');
     closeBtn.innerHTML = '&#10005;';
-    closeBtn.title = 'Close';
+    closeBtn.title = t('Close');
     closeBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       closeDropdown();
@@ -494,7 +509,7 @@ window.BAS = window.BAS || {};
     if (!histMode) {
       // Active alarms
       if (!latestAlarms.length) {
-        var empty = el('div', 'alarm-dd-empty', 'No active alarms');
+        var empty = el('div', 'alarm-dd-empty', t('No active alarms'));
         list.appendChild(empty);
       } else {
         for (var i = 0; i < latestAlarms.length; i++) {
@@ -505,7 +520,7 @@ window.BAS = window.BAS || {};
       // History rows
       var snap = histSnapshot();
       if (!snap.length) {
-        var emptyH = el('div', 'alarm-dd-empty', 'No alarm history yet');
+        var emptyH = el('div', 'alarm-dd-empty', t('No alarm history yet'));
         list.appendChild(emptyH);
       } else {
         for (var j = 0; j < snap.length; j++) {
@@ -558,12 +573,12 @@ window.BAS = window.BAS || {};
     });
     refs.navItems = {};
     mods.forEach(function (m) {
-      if (m.group !== lastGroup) { nav.appendChild(el('div', 'nav-sec', m.group)); lastGroup = m.group; }
+      if (m.group !== lastGroup) { nav.appendChild(el('div', 'nav-sec', t(m.group))); lastGroup = m.group; }
       var it = el('div', 'navitem');
       it.setAttribute('role', 'tab');
       it.id = 'tab-' + m.id;
       it.setAttribute('aria-selected', 'false');
-      it.innerHTML = U.icon(m.icon) + '<span class="label">' + m.title + '</span>';
+      it.innerHTML = U.icon(m.icon) + '<span class="label">' + t(m.title) + '</span>';
       var badge = el('span', 'badge-n'); badge.style.display = 'none'; it.appendChild(badge);
       it.addEventListener('click', function () { location.hash = '#' + m.id; });
       it.dataset.id = m.id;
@@ -645,7 +660,7 @@ window.BAS = window.BAS || {};
       refs.banner.classList.remove('hidden');
       var worst = al[al.length - 1];
       refs.bannerMsg.textContent = 'ALID ' + worst.alid + ' — ' + worst.text + ' @ ' + worst.tool;
-      refs.bannerCnt.textContent = al.length + ' active alarm' + (al.length > 1 ? 's' : '');
+      refs.bannerCnt.textContent = al.length + ' ' + (al.length > 1 ? t('active alarms') : t('active alarm'));
       // urgency glow when any active alarm is critical/major
       var anyCrit = false;
       for (var ci = 0; ci < al.length; ci++) {

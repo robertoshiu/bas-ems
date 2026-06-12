@@ -18,6 +18,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master, P = BAS.prng;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // ---- hero refs (filled at mount; mutated, never reallocated) -----------
   var heroRead, heroSub, hk = {};            // big-read CFM + sub + KPI value spans
@@ -74,13 +75,13 @@
   // Gas yard schematic layout (viewBox 520 x 230). Bulk tanks are identity boxes;
   // live distribution flow is shown on the header node (n2Flow).
   var GY_NODES = [
-    { id: 'n2',    label: 'N2 Bulk',  x: 60,  y: 40,  channel: false },
-    { id: 'o2',    label: 'O2 Bulk',  x: 60,  y: 90,  channel: false },
-    { id: 'ar',    label: 'Ar Bulk',  x: 60,  y: 140, channel: false },
-    { id: 'h2',    label: 'H2 Bulk',  x: 60,  y: 190, channel: false },
-    { id: 'hdr',   label: 'Gas Hdr',  x: 220, y: 100, channel: 'n2Flow' },
-    { id: 'scrb',  label: 'Scrubber', x: 380, y: 70,  channel: 'exAcidCFM' },
-    { id: 'tox',   label: 'Oxidizer', x: 380, y: 155, channel: 'exAcidCFM' }
+    { id: 'n2',    label: T('N2 Bulk'),  x: 60,  y: 40,  channel: false },
+    { id: 'o2',    label: T('O2 Bulk'),  x: 60,  y: 90,  channel: false },
+    { id: 'ar',    label: T('Ar Bulk'),  x: 60,  y: 140, channel: false },
+    { id: 'h2',    label: T('H2 Bulk'),  x: 60,  y: 190, channel: false },
+    { id: 'hdr',   label: T('Gas Hdr'), x: 220, y: 100, channel: 'n2Flow' },
+    { id: 'scrb',  label: T('Scrubber'), x: 380, y: 70,  channel: 'exAcidCFM' },
+    { id: 'tox',   label: T('Oxidizer'), x: 380, y: 155, channel: 'exAcidCFM' }
   ];
   var GY_PIPES = [
     { from: 'n2',  to: 'hdr', channel: 'n2Flow' },
@@ -95,9 +96,9 @@
     id: 'gas-exhaust', title: 'Gas & Exhaust', group: 'BAS', order: 4, icon: 'gas',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Bulk Gas &amp; Exhaust / Abatement</h1>' +
-        '<span class="crumb">FAB-1 · N2/H2/Ar · Scrubbers · Thermal Oxidizers</span>' +
-        '<span class="right">acid exhaust &amp; abatement track Etch / Wet &#8595;</span>';
+      head.innerHTML = '<h1>' + T('Bulk Gas & Exhaust / Abatement') + '</h1>' +
+        '<span class="crumb">FAB-1 · N2/H2/Ar · ' + T('Scrubbers · Thermal Oxidizers') + '</span>' +
+        '<span class="right">' + T('acid exhaust & abatement track Etch / Wet') + ' &#8595;</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -109,7 +110,7 @@
       var hero = el('div', 'pg-hero');
 
       var sig = el('div', 'pg-hero-sig');
-      sig.appendChild(el('div', 'pg-hero-label', 'TOTAL EXHAUST'));
+      sig.appendChild(el('div', 'pg-hero-label', T('TOTAL EXHAUST')));
       heroRead = el('div', 'pg-hero-read');
       var rn = el('span'); heroRead.appendChild(rn);
       heroRead.appendChild(el('span', 'u', 'kCFM'));
@@ -126,7 +127,7 @@
        ['abate', 'Abatement', 'kW', 'accent'], ['eff', 'Destruction', '%', 'good']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var v = el('div', 'v');
         var vn = el('span'); v.appendChild(vn);
         v.appendChild(el('span', 'u', k[2]));
@@ -143,7 +144,7 @@
       // (2) ABATEMENT STATUS WALL — .status-card per scrubber + oxidizer
       // ====================================================================
       var wallP = U.panel('Abatement Status Wall — Wet Scrubbers + Thermal Oxidizers',
-        { cls: 'col-12', meta: 'EXHAUST · destruction eff %', metaId: 'gx-wallmeta' });
+        { cls: 'col-12', meta: 'EXHAUST · ' + T('destruction') + ' eff %', metaId: 'gx-wallmeta' });
       var wall = el('div', 'gx-wall');
       // 4 scrubbers then 2 oxidizers
       M.facility.scrubbers.forEach(function (s, i) { wall.appendChild(buildAbateCard('scrub', s, i)); });
@@ -164,7 +165,7 @@
       // ====================================================================
       // (4) BULK GAS USAGE — glow-dot heat tiles (one per bulk gas)
       // ====================================================================
-      var usageP = U.panel('Bulk Gas Distribution — Live Flow', { cls: 'col-5', meta: 'Nm³/h · header pressure', metaId: 'gx-usemeta' });
+      var usageP = U.panel('Bulk Gas Distribution — Live Flow', { cls: 'col-5', meta: 'Nm³/h · ' + T('header pressure'), metaId: 'gx-usemeta' });
       var hg = el('div', 'heat-grid');
       GAS_ORDER.forEach(function (sym) {
         var g = GASES[sym];
@@ -200,7 +201,7 @@
       // ====================================================================
       // (6) EXHAUST HEADERS — segregated balance table
       // ====================================================================
-      var exP = U.panel('Segregated Exhaust Headers — Flow Balance', { cls: 'col-6', meta: 'general / heat / acid / solvent', metaId: 'gh-exmeta' });
+      var exP = U.panel('Segregated Exhaust Headers — Flow Balance', { cls: 'col-6', meta: T('General').toLowerCase() + ' / ' + T('Heat').toLowerCase() + ' / ' + T('Acid').toLowerCase() + ' / ' + T('Solvent').toLowerCase(), metaId: 'gh-exmeta' });
       exHdrTbl = U.table([
         { label: 'Header', key: 'hdr', tdCls: 'name' },
         { label: 'Flow CFM', key: 'flow', tdCls: 'num' },
@@ -259,7 +260,7 @@
 
       // ---- HERO (every frame — cheap text writes, change-gated by widget-free guards)
       heroRead._num.textContent = (totalCFM / 1000).toFixed(1);
-      heroSub.textContent = Math.round(totalCFM / 1000) + ' kCFM moved · ' + avgEff.toFixed(2) + '% avg destruction';
+      heroSub.textContent = Math.round(totalCFM / 1000) + ' kCFM ' + T('moved') + ' · ' + avgEff.toFixed(2) + '% ' + T('avg destruction');
       hk.acid._num.textContent = (exAcid / 1000).toFixed(1);
       hk.solvent._num.textContent = (exSol / 1000).toFixed(1);
       hk.heat._num.textContent = (exHeat / 1000).toFixed(1);
@@ -286,10 +287,10 @@
             // health: pH drifting acidic or eff sagging -> warn/bad
             var st = (ph < 6.4 || eff < 99.0) ? 'bad' : (ph < 6.8 || eff < 99.15) ? 'warn' : 'ok';
             setAbateCard(c, st, eff.toFixed(2), [
-              ['Inlet', U.group(Math.round(inlet)) + ' CFM'],
-              ['Blower', Math.round(kw) + ' kW'],
-              ['Liquor pH', ph.toFixed(2)],
-              ['Recirc', Math.round(recirc) + ' L/m']
+              [T('Inlet'), U.group(Math.round(inlet)) + ' CFM'],
+              [T('Blower'), Math.round(kw) + ' kW'],
+              [T('Liquor pH'), ph.toFixed(2)],
+              [T('Recirc'), Math.round(recirc) + ' L/m']
             ]);
           } else {
             var oeff = 99.6 - acidLoadFrac * 0.12 + U.jitter('gh:oxef:' + c.id, tk, 0.03) - c.idx * 0.04;
@@ -298,10 +299,10 @@
             var oin = (exSol * (0.5 + c.idx * 0.02)) + U.jitter('gh:oxin:' + c.id, tk, 350);
             var ost = (stack < 740 || oeff < 99.3) ? 'warn' : 'ok';
             setAbateCard(c, ost, oeff.toFixed(2), [
-              ['Inlet', U.group(Math.round(oin)) + ' CFM'],
-              ['Stack', Math.round(stack) + ' °C'],
-              ['Fuel', fuel.toFixed(1) + ' Nm³/h'],
-              ['Type', 'VOC / pyro']
+              [T('Inlet'), U.group(Math.round(oin)) + ' CFM'],
+              [T('Stack'), Math.round(stack) + ' °C'],
+              [T('Fuel'), fuel.toFixed(1) + ' Nm³/h'],
+              [T('Type'), T('VOC / pyro')]
             ]);
           }
         }
@@ -330,7 +331,7 @@
           var tank = g.tank + U.jitter('gh:bt:' + sym, tk, 0.4);
           var dew = (g.dew + U.jitter('gh:bd:' + sym, tk, 0.6)).toFixed(1);
           return {
-            gas: g.name + ' (' + sym + ')',
+            gas: T(g.name) + ' (' + sym + ')',
             hdr: hdr.toFixed(2),
             flow: U.group(Math.round(flow)),
             tank: tank, tankCls: U.band(tank, 35, 25, true),
@@ -349,7 +350,7 @@
           var sharePct = clamp(f / maxF * 100, 2, 100);
           var shareCls = h.seg === 'acid' ? 'warn' : h.seg === 'solvent' ? 'bad' : 'good';
           return {
-            hdr: h.key + ' (' + h.seg + ')', flow: U.group(Math.round(f)),
+            hdr: T(h.key) + ' (' + T(h.seg) + ')', flow: U.group(Math.round(f)),
             sharePct: sharePct.toFixed(0), shareCls: shareCls,
             dp: Math.round(dp), state: st
           };
@@ -365,7 +366,7 @@
           var purge = state === 'Purge' ? Math.round(2000 + U.jitter('gh:cpg:' + cc.id, tk, 40))
             : Math.round(120 + U.jitter('gh:cpgi:' + cc.id, tk, 8));
           return {
-            name: 'Gas Cabinet ' + (i + 1),
+            name: T('Gas Cabinet') + ' ' + (i + 1),
             gas: gas,
             haz: hazTag(CAB_HAZ[gas]),
             state: stateBadgeName(state),
@@ -389,7 +390,7 @@
   function buildAbateCard(kind, asset, idx) {
     var card = el('div', 'status-card ok');
     var headRow = el('div', 'sc-head');
-    headRow.appendChild(el('div', 'sc-name', asset.name));
+    headRow.appendChild(el('div', 'sc-name', T(asset.name)));
     var badgeSlot = el('span', 'gx-badge-slot');
     badgeSlot.appendChild(U.stateBadge('Productive'));
     headRow.appendChild(badgeSlot);
@@ -399,7 +400,7 @@
     var effRow = el('div', 'gx-eff');
     var en = el('span', 'gx-eff-v', '—');
     effRow.appendChild(en);
-    effRow.appendChild(el('span', 'gx-eff-u', '% destruction'));
+    effRow.appendChild(el('span', 'gx-eff-u', T('% destruction')));
     card.appendChild(effRow);
 
     var stats = el('div', 'sc-stats');

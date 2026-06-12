@@ -22,6 +22,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el, M = BAS.master;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // ---- closure-scope refs (filled at mount; mutated, never reallocated) ----
   var hk = {};                  // hero KPI value spans (by key)
@@ -46,9 +47,9 @@
     id: 'cleanroom', title: 'Cleanroom', group: 'BAS', order: 1, icon: 'cleanroom',
     mount: function (root) {
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Cleanroom Environmental</h1>' +
+      head.innerHTML = '<h1>' + T('Cleanroom Environmental') + '</h1>' +
         '<span class="crumb">FAB-1 · HVAC · FFU · ISO 14644 · ULPA</span>' +
-        '<span class="right">FFU fan power tracks HVAC load &#8595;</span>';
+        '<span class="right">' + T('FFU fan power tracks HVAC load') + ' &#8595;</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -60,7 +61,7 @@
 
       // left signature: the 2x4 bay tile wall
       var sig = el('div', 'cr-floor-sig');
-      sig.appendChild(el('div', 'pg-hero-label', 'BAY FLOOR PLAN — ≥0.5µm/m³ vs ISO LIMIT'));
+      sig.appendChild(el('div', 'pg-hero-label', T('BAY FLOOR PLAN — ≥0.5µm/m³ vs ISO LIMIT')));
       var floor = el('div', 'heat-grid cr-floor');
       for (var bi = 0; bi < M.bays.length; bi++) {
         var bay = M.bays[bi];
@@ -96,7 +97,7 @@
        ['worst', 'Worst Bay dP', 'Pa', '']
       ].forEach(function (k) {
         var box = el('div', 'pg-hk' + (k[3] ? ' ' + k[3] : ''));
-        box.appendChild(el('div', 'lab', k[1]));
+        box.appendChild(el('div', 'lab', T(k[1])));
         var vv = el('div', 'v');
         var vn = el('span'); vv.appendChild(vn);
         if (k[2]) { var vu = el('span', 'u', k[2]); vv.appendChild(vu); }
@@ -159,7 +160,7 @@
         var s = sampleBay(bay, frame);
         sumT += s.tempN; sumRH += s.rhN; sumDP += s.dpN; sumFlow += s.flowN; sumPart += s.partN;
         ffuOnline += s.row.ffuOn; ffuTotal += s.row.ffu;
-        if (s.dpN < worstDp) { worstDp = s.dpN; worstName = bay.name; }
+        if (s.dpN < worstDp) { worstDp = s.dpN; worstName = T(bay.name); }
         if (rows) rows.push(s.row);
         if (paintTiles) paintTile(tiles[i], s);
       }
@@ -190,7 +191,7 @@
       }
       if (fc % 16 === 0) {
         var meta = document.getElementById('crHeroMeta');
-        if (meta) meta.textContent = worstName + ' lowest · ' + ffuOnline + '/' + ffuTotal + ' FFU online';
+        if (meta) meta.textContent = worstName + ' ' + T('lowest') + ' · ' + ffuOnline + '/' + ffuTotal + ' FFU ' + T('online');
       }
 
       // Heavy table rebuild throttled to every 8 frames.
@@ -279,7 +280,7 @@
     return {
       tempN: temp, rhN: rh, dpN: dp, flowN: flow, partN: part, frac: frac,
       row: {
-        bay: bay.name, area: bay.area, iso: iso,
+        bay: T(bay.name), area: bay.area, iso: iso,
         temp: temp.toFixed(2), rh: rh.toFixed(1),
         dp: dp, dpState: dpState,
         ffu: bay.ffuCount, ffuOn: ffuOn, ffuPct: ffuPct,
@@ -318,7 +319,7 @@
     var top = el('div');
     top.style.display = 'flex'; top.style.justifyContent = 'space-between';
     top.style.alignItems = 'baseline'; top.style.marginBottom = '4px';
-    top.appendChild(el('span', 'dim', label));
+    top.appendChild(el('span', 'dim', T(label)));
     var u = el('span', 'mono', unit);
     u.style.fontSize = 'var(--fs-0)'; u.style.color = 'var(--text-mut)';
     top.appendChild(u);

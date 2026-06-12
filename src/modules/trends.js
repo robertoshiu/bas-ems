@@ -24,6 +24,7 @@
 (function (BAS) {
   'use strict';
   var U = BAS.ui, el = U.el;
+  var T = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
 
   // Constants (resolved lazily in mount, after BAS.sim.init())
   var PERIOD = 180;    // real seconds per loop (= BAS.clock.PERIOD)
@@ -285,9 +286,9 @@
       precompute();
 
       var head = el('div', 'view-head');
-      head.innerHTML = '<h1>Trends / Historian</h1>' +
-        '<span class="crumb">FAB-1 · Whole-Hour Curves · Setpoint Bands · Now Cursor</span>' +
-        '<span class="right">one loop = 60 sim-min · 240 samples &#8595;</span>';
+      head.innerHTML = '<h1>' + T('Trends / Historian') + '</h1>' +
+        '<span class="crumb">FAB-1 · ' + T('Whole-Hour Curves · Setpoint Bands · Now Cursor') + '</span>' +
+        '<span class="right">' + T('one loop = 60 sim-min · 240 samples') + ' &#8595;</span>';
       root.appendChild(head);
 
       var grid = el('div', 'grid');
@@ -305,7 +306,7 @@
         (function (ch, colCls) {
           var s = ch.series;
           var meta = buildMeta(ch);
-          var p = U.panel(s.title + ' — ' + s.unit, { cls: colCls, meta: meta });
+          var p = U.panel(T(s.title) + ' — ' + s.unit, { cls: colCls, meta: meta });
           // Relative wrapper anchors the crisp DOM label overlays to the chart (not the page).
           var wrap = el('div', 'trend-chart-wrap');
           var canvas = el('canvas', 'trend-chart');
@@ -434,7 +435,7 @@
       sw.style.backgroundColor = s.color;
       sw.style.boxShadow = '0 0 6px ' + U.hexA(s.color, 0.7);
       nameWrap.appendChild(sw);
-      nameWrap.appendChild(el('span', 'thw-nm', s.title));
+      nameWrap.appendChild(el('span', 'thw-nm', T(s.title)));
       nameWrap.appendChild(el('span', 'thw-u', s.unit));
       row.appendChild(nameWrap);
 
@@ -517,7 +518,7 @@
       var key = s.id + ':' + idx;
       if (key !== lastTipKey) {
         lastTipKey = key;
-        tipChan.textContent = s.title;
+        tipChan.textContent = T(s.title);
         tipChan.style.color = s.color;
         tipTime.textContent = timeLabelOf(idx);
         tipVal.textContent = formatVal(ch.vals[idx], s.unit) + ' ' + s.unit;
@@ -542,10 +543,10 @@
   function buildMeta(ch) {
     var s = ch.series;
     if (s.bandLo !== null && s.bandHi !== null) {
-      if (s.isSpec) return 'spec ' + s.bandLo.toFixed(2) + '–' + s.bandHi.toFixed(2) + ' ' + s.unit;
-      return 'band ' + s.bandLo.toFixed(1) + '–' + s.bandHi.toFixed(1) + ' ' + s.unit;
+      if (s.isSpec) return T('spec') + ' ' + s.bandLo.toFixed(2) + '–' + s.bandHi.toFixed(2) + ' ' + s.unit;
+      return T('band') + ' ' + s.bandLo.toFixed(1) + '–' + s.bandHi.toFixed(1) + ' ' + s.unit;
     }
-    if (s.peakLine && s.peakMW !== undefined) return 'peak ' + s.peakMW.toFixed(1) + ' MW';
+    if (s.peakLine && s.peakMW !== undefined) return T('peak') + ' ' + s.peakMW.toFixed(1) + ' MW';
     return '60 sim-min';
   }
 
@@ -569,7 +570,7 @@
     var xs = [0, 15, 30, 45, 60];
     for (var i = 0; i < xs.length; i++) ov('x-axis', 'data-x', '' + xs[i], xs[i] + 'm');
     // Peak readout (demand chart only) — DOM now, so it matches the other labels.
-    if (s.peakLine && s.peakMW !== undefined) ov('', 'data-stat', 'peak', 'peak ' + s.peakMW.toFixed(1));
+    if (s.peakLine && s.peakMW !== undefined) ov('', 'data-stat', 'peak', T('peak') + ' ' + s.peakMW.toFixed(1));
   }
 
   // ---- Rebuild the offscreen static layer for one chart -----------------

@@ -5,6 +5,8 @@ window.BAS = window.BAS || {};
 (function (BAS) {
   'use strict';
 
+  var t = (BAS.i18n && BAS.i18n.t) ? BAS.i18n.t : function (s) { return s; };
+
   // ---- module registry --------------------------------------------------
   BAS.modules = [];
   BAS.registerModule = function (def) { BAS.modules.push(def); return def; };
@@ -25,9 +27,9 @@ window.BAS = window.BAS || {};
     opts = opts || {};
     var p = el('div', 'panel' + (opts.cls ? ' ' + opts.cls : ''));
     var h = el('div', 'panel-h');
-    h.appendChild(el('span', 't', title));
-    if (opts.meta) { var m = el('span', 'meta'); m.id = opts.metaId || ''; m.textContent = opts.meta; h.appendChild(m); }
-    if (opts.pill) h.appendChild(el('span', 'pill', opts.pill));
+    h.appendChild(el('span', 't', t(title)));
+    if (opts.meta) { var m = el('span', 'meta'); m.id = opts.metaId || ''; m.textContent = t(opts.meta); h.appendChild(m); }
+    if (opts.pill) h.appendChild(el('span', 'pill', t(opts.pill)));
     var b = el('div', 'panel-b' + (opts.bodyCls ? ' ' + opts.bodyCls : ''));
     p.appendChild(h); p.appendChild(b);
     p._body = b; p._head = h;
